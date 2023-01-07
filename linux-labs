@@ -52,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.3"
+g_VERSION="0.0.2"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023"
@@ -107,6 +107,8 @@ function script_banner ()
      printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
+
+     update_notice
 }
 
 # (info) - Function for formatted informational messages.
@@ -313,13 +315,15 @@ function update ()
      # Get the version form the repository and source the file.
      wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/.version
      source "${g_SCRIPT_PATH}/.version"
+     rm "${g_SCRIPT_PATH}/.version"
 
      # Compare the script versions and update if newer.
      if version $v_VERSION $g_VERSION; then
-          info "  Updating the $g_PROGRAM_NAME script."
+          info "Updating the $g_PROGRAM_NAME script."
 
           # Get a new version of the script.
-          wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+          #wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+          wget -O -c https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
      fi
 
      cleanup_and_exit_with_code 0
@@ -337,10 +341,8 @@ function update_notice ()
 
      # Compare the script versions and update if newer.
      if version $v_VERSION $g_VERSION; then
-          info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt."
+          info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
      fi
-
-     cleanup_and_exit_with_code 0
 }
 
 # ##############################################################################
@@ -2620,7 +2622,6 @@ function chapter_twenty-nine ()
 
 # *************************** begin of script proper ***************************
 script_banner
-#update_notice
 process_command_line_options "${@}"
 internal_consistency_option_checks
 
@@ -2647,7 +2648,6 @@ if ((g_ARG_ROLLBACK_LAB==1)); then
 fi
 
 if ((g_ARG_UPDATE==1)); then
-     info "Update the current script to a new version."
      update
 fi
 
