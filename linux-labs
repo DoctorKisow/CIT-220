@@ -49,7 +49,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.4"
+g_VERSION="0.0.5"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -317,7 +317,7 @@ function update ()
      l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
      curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
 
-     l_VERSION=$(grep "^g_VERSION" "$TMP_FILE" | awk -F'[="]' '{print $3}')
+     l_VERSION=$(grep "^g_VERSION" "$l_TMP_FILE" | awk -F'[="]' '{print $3}')
 
      # Compare the script versions and update if newer.
      if [ "$g_VERSION" \< "$l_VERSION" ]; then
@@ -343,13 +343,17 @@ function update ()
 # (update_notice) - Function used to notify the user of a new script available in the repository.
 function update_notice ()
 {
+     local l_TMP_FILE
+     local l_ABS_PATH
+     local l_VERSION
+
      cd ${g_SCRIPT_PATH}
 
      # Get a new version of the script.
      l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
      curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
 
-     l_VERSION=$(grep "^g_VERSION" "$TMP_FILE" | awk -F'[="]' '{print $3}')
+     l_VERSION=$(grep "^g_VERSION" "$l_TMP_FILE" | awk -F'[="]' '{print $3}')
 
      # Compare the script versions and notify if newer.
      if [ "$g_VERSION" \< "$l_VERSION" ]; then
