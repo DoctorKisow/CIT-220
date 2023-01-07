@@ -21,9 +21,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-
-#git@github.com:DoctorKisow/CIT-220.git
-
 # ##############################################################################
 # Virtual Machine Setup
 #
@@ -55,8 +52,12 @@ g_PROGNAME="$(basename "${0}")"
 g_VERSION="0.0.2"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
+g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023"
 g_AUTHOR_TEXT="Dr. Matthew Kisow"
+
+# Script location where it was run from.
+g_SCRIPT_LOCATION="${BASH_SOURCE[@]}"
 
 # (g_<color>_TEXT) - Variables used to control how output is displayed to the screen during script execution.
 g_RED_TEXT="" g_GREEN_TEXT="" g_YELLOW_TEXT="" g_BLUE_TEXT="" g_MAGENTA_TEXT="" g_CYAN_TEXT="" g_WHITE_TEXT="" g_RESET_ATTS=""  g_ALERT_TEXT=""
@@ -108,7 +109,9 @@ function script_banner ()
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
 
-     update_notice
+     if ! ((g_ARG_UPDATE)); then
+          update_notice
+     fi
 }
 
 # (info) - Function for formatted informational messages.
@@ -308,6 +311,9 @@ function version ()
 # (update) - Function used to check for and update this script from the repository.
 function update ()
 {
+     local l_TMP_FILE
+     local l_ABS_PATH
+
      info "Checking for updates to the installation script."
 
      cd ${g_SCRIPT_PATH}
@@ -320,10 +326,23 @@ function update ()
      # Compare the script versions and update if newer.
      if version $v_VERSION $g_VERSION; then
           info "Updating the $g_PROGRAM_NAME script."
+          #printf "Updating ${g_PROGNAME} \e[31;1m%s\e[0m -> \e[32;1m%s\e[0m\n" "$g_VERSION" "$v_VERSION"
 
           # Get a new version of the script.
-          #wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
-          wget -O -c https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+          #wget -q -O ${g_PROGNAME}.new https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+          l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
+          curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
+
+          # Create updater script.
+          l_ABS_PATH=$(readlink -f "$g_SCRIPT_LOCATION")
+
+          printf '#!/bin/bash\n\n' >> updater.sh
+          printf "cp \"$l_TMP_FILE\" \"$l_ABS_PATH\"\n" >> updater.sh
+
+          chmod +x updater.sh
+          chmod 770 "$l_TMP_FILE"
+          chown root:labusers1 "$l_TMP_FILE"
+          exec /bin/bash $g_SCRIPT_PATH/updater.sh
      fi
 
      cleanup_and_exit_with_code 0
@@ -342,6 +361,11 @@ function update_notice ()
      # Compare the script versions and update if newer.
      if version $v_VERSION $g_VERSION; then
           info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
+     else
+          info "You are at the current version of this script."
+          if [ -f ${g_SCRIPT_PATH}/update.sh ]; then
+               rm ${g_SCRIPT_PATH}/update.sh
+          fi
      fi
 }
 
