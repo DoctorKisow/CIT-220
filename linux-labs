@@ -168,7 +168,7 @@ function print_usage ()
 {
      cat << EOF
   Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
-                       [-u|--update] [-v]
+                    [-u|--update] [-v]
   Options:
     -c                     roll the enviornment forward to a lab [1-29]
     -g                     grade a completed lab [1-29]
@@ -334,7 +334,7 @@ function update ()
           chown root:labusers1 "$l_TMP_FILE"
           exec /bin/bash $g_SCRIPT_PATH/updater.sh
      else
-          rm "$l_TMP_FILE"
+          rm -f "$l_TMP_FILE"
      fi
 
      cleanup_and_exit_with_code 0
@@ -357,16 +357,16 @@ function update_notice ()
 
      # Compare the script versions and notify if newer.
      if [ "$g_VERSION" \< "$l_VERSION" ]; then
-          info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
+          info "There is a new version v$l_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
      else
           info "You are at the current version of this script.\n\n"
-
-          rm "$l_TMP_FILE"
 
           if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
                rm "${g_SCRIPT_PATH}/updater.sh"
           fi
      fi
+
+     rm -f $l_TMP_FILE
 }
 
 # ##############################################################################
