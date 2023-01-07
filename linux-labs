@@ -1,0 +1,2653 @@
+#!/bin/bash
+#
+# linux-labs - A script used to download, setup and grade the CIT-220 lab
+# enviornment in my CIT-220 Linux System Administration classes.
+# Copyright (c) 2022-2023 Matthew R. Kisow, D.Sc. <matthew.kisow@kisow.org>
+#
+# License (GPL v3.0)
+# ------------------
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+#git@github.com:DoctorKisow/CIT-220.git
+
+# ##############################################################################
+# Virtual Machine Setup
+#
+# SCSI1: 20Gb     /dev/sda1     1Gb     /boot/efi
+#                 /dev/sda2     19Gb    /
+# SCSI2: 256Mb    /dev/sdb1             /Lab Files/CH12
+# SCSI3: 256Mb    LAB18-01
+# SCSI4: 128Mb    LAB19-01      LVM
+# SCSI5: 128Mb    LAB19-01      LVM
+# SCSI6: 64Mb     LAB19-02      RAID
+# SCSI7: 64Mb     LAB19-02      RAID
+# SCSI8: 64Mb     LAB19-02      RAID
+# ##############################################################################
+
+# Scroll to the bottom of this script to follow the main script flow.
+
+## Set how the script will behave when certain conditions are encountered.
+# Enable exiting immediately if a command exits with a non-zero status.
+set -e
+
+# Enable erroring on un-bound (undefined) variables.
+set -u
+
+# Enable filename patterns that match no files to expand to a null string, rather than themselves.
+shopt -s nullglob
+
+# ************************* global variable definitions ************************
+g_PROGNAME="$(basename "${0}")"
+g_VERSION="0.0.1"
+g_PROGRAM_NAME="linux-labs"
+g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
+g_COPYRIGHT_TEXT="Copyright (c) 2022-2023"
+g_AUTHOR_TEXT="Dr. Matthew Kisow"
+
+# (g_<color>_TEXT) - Variables used to control how output is displayed to the screen during script execution.
+g_RED_TEXT="" g_GREEN_TEXT="" g_YELLOW_TEXT="" g_BLUE_TEXT="" g_MAGENTA_TEXT="" g_CYAN_TEXT="" g_WHITE_TEXT="" g_RESET_ATTS=""  g_ALERT_TEXT=""
+if [[ -v TERM && -n "${TERM}" && "${TERM}" != "dumb" ]]; then
+    g_RED_TEXT="$(tput setaf 1)$(tput bold)"
+    g_GREEN_TEXT="$(tput setaf 2)$(tput bold)"
+    g_YELLOW_TEXT="$(tput setaf 3)$(tput bold)"
+    g_BLUE_TEXT="$(tput setaf 4)$(tput bold)"
+    g_MAGENTA_TEXT="$(tput setaf 5)$(tput bold)"
+    g_CYAN_TEXT="$(tput setaf 6)$(tput bold)"
+    g_WHITE_TEXT="$(tput setaf 7)$(tput bold)"
+    g_RESET_ATTS="$(tput sgr0)"
+    g_ALERT_TEXT="$(tput bel)"
+fi
+
+# (g_LAB_PATH) - String that holds the location to the lab files.
+g_LAB_PATH="/Lab Files"
+
+# (g_PREFIXSTRING) - String value used to indicate what is appended to the output at the beginning of screen output during script execution.
+g_PREFIXSTRING="*  "
+
+# (g_SHOWPREFIX) - String value used to indicate normal script execution.
+g_SHOWPREFIX="${g_GREEN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}"
+
+# (g_SCRIPT_PATH) - String value used to hold the execution path of the script.
+g_SCRIPT_PATH="`dirname \"$0\"`"
+g_SCRIPT_PATH="`( cd \"$g_SCRIPT_PATH\" && pwd )`"
+
+# (g_ARG_<variable>) - Boolean values used to indicate which command line options are sed during execution; the default for all values is 0.
+
+# WARNING: DO NOT MODIFY THESE VALUE(S)!
+declare -i g_ARG_CHANGE_LAB=0
+declare -i g_ARG_GRADE_LAB=0
+declare -i g_ARG_INSTALL=0
+declare -i g_ARG_UPDATE=0
+
+declare -i g_ARG_CHANGE=0
+declare -i g_ARG_GRADE=0
+
+# ********************************** functions *********************************
+# (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
+function script_banner ()
+{
+     clear
+     printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
+     printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
+     printf -- "--------------------------------------------------------------------------------\n"
+}
+
+# (info) - Function for formatted informational messages.
+function info ()
+{
+     echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
+}
+
+# (warning) - Function for formatted warning messages.
+function warning ()
+{
+     echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}WARNING: ${1}" >&2
+}
+
+# (error) - Function for the error catching routine, display an error cleanup
+# and exit the script.
+function error ()
+{
+    echo
+    echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
+    cleanup_and_exit_with_code 1
+}
+
+# (cleanup_and_exit_with_code) - Function used to properly cleanup the enviornment after an error; the passed value are 1 (error) or 0 (normal).
+# (cleanup_and_exit_with_code) - Function used to cleanup the enviornment when an error condition is encountered.
+function cleanup_and_exit_with_code ()
+{
+     # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
+     l_BOOL='^[0-1]+$'
+     if ! [[ $1 =~ $l_BOOL ]]; then
+          error "Function: cleanup_and_exit_with_code was passed a value that is out of bounds."
+     fi
+
+     # If output was redirected to the logfile during an interactive session, repoint it to the console.
+     exec &>$(tty)
+
+     # Error trapping is turned off because we want to handle errors.
+     set +e
+     trap - EXIT
+
+     exit $1
+}
+
+# (trap_cleanup) - Function used to set how we want the script to handle any error conditions it encounters and what we want to do once those error conditions are encountered.
+function trap_cleanup ()
+{
+     trap - SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
+     error "Caught signal"
+}
+trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
+
+# (print_usage) - Function used to display the scripts usage and command line options.
+function print_usage ()
+{
+     cat << EOF
+  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-u|--update] [-v]
+  Options:
+    -c,                     roll the enviornment forward to a lab [1-29]
+    -g,                     grade a completed lab [1-29]
+    -h,                     show this help message
+    -i, --install           install the lab enviornment
+    -u, --update            update the ${g_PROGNAME} script
+    -v,                     display the version number of ${g_PROGNAME} and exit
+EOF
+}
+
+# (help) - Function used to display the scripts usage and command line options.
+function help ()
+{
+     printf "${g_PROGNAME} - ${g_PROGRAM_DESCRIPTION}\n"
+     print_usage
+}
+
+# (print_version) - Function used to print the script version.
+function print_version ()
+{
+     printf "%s\n" "${g_VERSION}"
+}
+
+# (display_usage_message_and_bail_out) - Function used to display the usage when an invalid command line option is passed to the script.
+function display_usage_message_and_bail_out ()
+{
+     if [ ! -z "${1+x}" ]; then
+          printf "%s: %s\n" "${g_PROGNAME}" "${1}" >&2
+     fi
+
+     print_usage >&2
+     cleanup_and_exit_with_code 1
+}
+
+# (process_command_line_options) - Function used to set and validate command line options passed to the script.
+function process_command_line_options ()
+{
+     # (l_TEMP) - Local array used to hold the list of command line arguements passed from the cammandline during script execution.
+     local l_TEMP
+
+     # (l_RC) - Local boolean value used to test if any commandline arguements passed from the cammandline during script execution are invalid.
+     declare -i l_RC
+
+     # Error trapping is turned off because we want to handle errors.
+     set +e
+          l_TEMP="$(getopt -o c:g:hiuv --long install,update -n "${g_PROGNAME}" -- "${@}")"
+          l_RC="${?}"
+     set -e
+
+     # Check if any invalid options were passed and display help.
+     if ((l_RC!=0)); then
+          display_usage_message_and_bail_out
+     fi
+
+     eval set -- "${l_TEMP}"
+
+     for arg in "${@}"; do
+          shift
+          case "$arg" in
+               --install) set -- "$@" '-i' ;;
+               --update)  set -- "$@" '-u' ;;
+               *)         set -- "$@" "$arg" ;;
+          esac
+     done
+
+     # Extract the options and their arguments into variables.
+     while true ; do
+          case "${1}" in
+               -c) g_ARG_CHANGE_LAB=1; g_ARG_CHANGE=${2}; (( g_ARG_CHANGE >= 1 && g_ARG_CHANGE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+               -g) g_ARG_GRADE_LAB=1; g_ARG_GRADE=${2}; (( g_ARG_GRADE >= 1 && g_ARG_GRADE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+               -h) display_usage_message_and_bail_out ;;
+               -i) g_ARG_INSTALL=1; shift ;;
+               -u) g_ARG_UPDATE=1; shift ;;
+               -v) print_version >&2; cleanup_and_exit_with_code 1 ;;
+               --) shift; break ;;
+          esac
+     done
+}
+
+# (internal_consistency_option_checks) - Function used to validate the some of the more obvious configuration file snafus.
+function internal_consistency_option_checks ()
+{
+     if ((g_ARG_CHANGE_LAB==1)); then
+          if ((g_ARG_GRADE_LAB==1  ||  g_ARG_INSTALL==1  ||  g_ARG_UPDATE==1)); then
+               warning "You cannot change the enviornment with any other options set."
+               cleanup_and_exit_with_code 1
+          fi
+     fi
+
+     if ((g_ARG_UPDATE==1)); then
+          if ((g_ARG_CHANGE_LAB || g_ARG_GRADE_LAB==1  ||  g_ARG_INSTALL==1)); then
+               warning "You cannot update this script with any other options set."
+               cleanup_and_exit_with_code 1
+          fi
+     fi
+
+     if ((g_ARG_INSTALL==1)); then
+          if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_GRADE_LAB==1)); then
+               warning "You cannot setup the labs enviornment with any other options set."
+               cleanup_and_exit_with_code 1
+          fi
+     fi
+
+     if ((g_ARG_GRADE_LAB==1)); then
+          if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
+               warning "You cannot grade a lab with any other options set."
+               cleanup_and_exit_with_code 1
+          fi
+     fi
+}
+
+# (version) - Function used to compare version numbers of two version numbers passed to it.
+function version ()
+{
+     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1";
+}
+
+# (update) - Function used to check for and update this script from the repository.
+function update ()
+{
+     info "Checking for updates to the installation script."
+
+     cd ${g_SCRIPT_PATH}
+
+     # Get the version form the repository and source the file.
+     wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/.version
+     source "${g_SCRIPT_PATH}/.version"
+
+     # Compare the script versions and update if newer.
+     if version $v_VERSION $g_VERSION; then
+          info "  Updating the $g_PROGRAM_NAME script."
+
+          # Get a new version of the script.
+          wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+     fi
+
+     cleanup_and_exit_with_code 0
+}
+
+# ##############################################################################
+# SYSTEM BASE - Setup system for the rest of the labs.
+function base ()
+{
+     local v_LABUSER_PASS="P@\$\$w0rd"
+
+     # PACKAGES
+     #CH06 (ifconfig)
+     apt -y install net-tools
+     #CH07
+     apt -y install tree
+     #CH09
+     apt -y install acl
+     #CH11
+     apt -y install zip
+     #CH12
+     apt -y install quota
+     #CH16
+     apt -y install sysstat
+     #CH20
+     apt -y install network-manager
+     #CH21
+     apt -y install whois
+     #CH23
+     apt -y install at
+     #CH27
+     apt -y install git
+
+     # ADD GROUPS
+     groupadd labusers1
+     groupadd labusers2
+
+     # ADD USERS
+     useradd -c "Lab User 1" -m -s /bin/bash labuser1
+     usermod -u 500 labuser1
+     usermod -a -g labusers1 labuser1
+     usermod -a -G labusers2 labuser1
+     usermod -a -G sudo labuser1
+     echo "labuser1:${v_LABUSER_PASS}" | chpasswd
+
+     useradd -c "Lab User 2" -m -s /bin/bash labuser2
+     usermod -a -g labusers2 labuser2
+     echo "labuser2:${v_LABUSER_PASS}" | chpasswd
+
+     useradd -c "Lab User 3" -m -s /bin/bash labuser3
+     usermod -a -g labusers1 labuser3
+     usermod -a -G labusers2 labuser3
+     echo "labuser3:${v_LABUSER_PASS}" | chpasswd
+
+     # CREATE DIRECTORIES
+     mkdir $g_LAB_PATH
+     ln -s $g_LAB_PATH /labs
+
+     # SET SECURITY
+     chown root:labusers1 "$g_LAB_PATH"
+     chmod 02755 "$g_LAB_PATH"
+
+     # DISABLE SSH (CH05 LAB)
+     systemctl disable ssh.service
+     systemctl stop
+}
+
+# CH01 - Installing (No Labs)
+function chapter_one ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH01"
+     local v_LAB="$v_Working_Directory/LAB01-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+# CH02 - Package Management (No Labs)
+function chapter_two ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH02"
+     local v_LAB="$v_Working_Directory/LAB02-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+# CH03 - Virtualization (No Labs)
+function chapter_three ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH03"
+     local v_LAB="$v_Working_Directory/LAB03-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+# CH04 - The Boot Process (No Labs)
+function chapter_four ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH04"
+     local v_LAB="$v_Working_Directory/LAB04-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+# CH05 - Managing System Services
+function chapter_five ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH05"
+     local v_LAB="$v_Working_Directory/LAB05-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     #chown root:labusers1 $v_Working_Directory
+     chmod 00750 "$v_Working_Directory"
+
+     # CREATE LAB - SET PERMISSIONS
+cat > "$v_LAB" << EOF
+LAB:		     LAB05-01
+OBJECTIVE:     The objective of this lab is to learn how to enable and disable, start and stop services, and review system runlevels.
+
+1.	Change into the '/labs/CH05' folder.
+
+SERVICE MANAGEMENT
+2.	Using the systemctl command, check the status of the ssh service.
+     a.	Is the service enabled?
+     b.	Is the service started?
+
+3.	Using the systemctl command, enable the ssh service.
+     a.	What did you observe?
+
+4.	Using the systemctl command, what is the status of the ssh service?
+     a.	Is the service enabled?
+     b.	Is the service started?
+
+5.	Using the systemctl command, start the ssh service.
+     a.	What did you observe?
+
+6.	Using the systemctl command, what is the status of the ssh service?
+     a.	Is the service enabled?
+     b.	Is the service started?
+
+RUNLEVEL MANAGEMENT
+7.	Using the runlevel command, what is the current runlevel?
+     a.	What did you observe?
+EOF
+
+     chown root:labusers1 "$v_LAB"
+     chmod 644 "$v_LAB"
+
+     #Answers
+     #2
+     #systemctl status ssh
+     #3
+     #systemctl enable ssh
+     #4
+     #systemctl status ssh
+     #5
+     #systemctl start ssh
+
+}
+
+# CH06 - System Performance
+function chapter_six ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH06"
+     local v_LAB="$v_Working_Directory/LAB06-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     #chown root:labusers1 $v_Working_Directory
+     chmod 02774 "$v_Working_Directory"
+
+     # CREATE SCRIPT
+     printf '#!/bin/bash\n\n' >> "$v_Working_Directory/lab06-01.sh"
+     printf "# LAB6-01 - System Performance\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "# Copyright © 2022 - 2023\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "# Dr. Matthew Kisow\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "# CC BY-NC-ND 4.0\n\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "clear\n\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "echo \"Spawning processes for LAB6-01...\"\n\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "for i in {1..10}; do (lynx ccac.edu > /dev/null) & done\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "while true; do sleep 86400; done\n\n" >> "$v_Working_Directory/lab06-01.sh"
+     printf "exit 0\n" >> "$v_Working_Directory/lab06-01.sh"
+
+     chmod 00774 "$v_Working_Directory/lab06-01.sh"
+
+     # CREATE LAB - SET PERMISSIONS
+cat > "$v_LAB" << EOF
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH06 folder.
+
+1.	Change into the '/labs/CH06' folder.
+
+MEMORY MANAGEMENT
+2.	Using the free command, check how much memory and virtual memory are available on the system.
+     a.	How much of this did you understand?
+
+3.	Using the free command and the switch that puts these values into a human-readable format, check how much memory and virtual memory are available on the system.
+     a.	Is it more readable now?
+
+4.	Using the free command and the switch that shows the low and high values, determine how much memory and virtual memory are available.
+     a.	What do you see?
+     b.	Is it more readable now?
+
+PROCESS MANAGEMENT
+5.	Execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
+6.	Pipe the output of the ps command to the grep command listing only the lynx process.
+     a.	What did you observe?
+7.	Using the pstree command, list the lynx process.
+     a.	What did you observe?
+8.	Pipe the output of the ps command to the grep command listing only the lab06-01.sh script's process.
+     a.	What did you observe?
+     b.	Find the PID of lab06-01.sh script from the output of the previous command.
+9.	Using the kill command, the signal 9 switch (terminate immediately), and the PID from the previous command terminate the lab06-01.sh scripts process.
+     a.	Run the commands you used in steps 6 and 8 again.
+     b.	What did you observe?
+ 
+10.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
+11.	Using the kill and killall commands, follow the steps below:
+     a.	List all of the lynx processes.
+     b.	Terminate one of those processes using the kill <PID> command.
+     c.	Terminate another lynx process this time using the signal 9 switch.
+     d.	Relist the lynx processes.
+     e.	What did you notice when you relisted the running processes?
+     f.	Kill all of the remaining lynx processes using one command, and ensure you use the signal 9 switch. DO NOT terminate lab6-01.sh process yet.
+     g.	Which command and options did you use?
+     h.	Relist the lynx processes; are they all terminated?
+     i.	Now terminate lab06-01.sh process.
+
+PROCESS PRIORITY
+12.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background
+13.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
+     a.	Filter the processes out, focusing on user labuser1.
+     b.	What do you observe?
+     c.	Exit top.
+14.	Pipe the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
+15.	Use the renice command, to change the priority of lab06-01.sh PID to 5.
+16.	Pipe and scrutinize the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
+     a.	What changed?
+17.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
+     a.	Filter the processes out, focusing on user labuser1.
+     b.	What do you observe this time?
+     c.	From top, find and terminate using signal 9 the lab6-01.sh process.
+     d.	Find and type the PID of lab6-01.sh process.
+     e.	What did you observe?
+     f.	Exit top.
+ 
+SCREEN
+18.	Using the pstree command, list the processes for labuser1.
+     a.	What do you observe?
+19.	Type the screen command, and start the screen virtual window manager.
+     a.	Type [ESC] to continue.
+20.	Using the pstree command, list the processes for labuser1.
+     a.	What do you observe?
+21.	Start a new virtual screen session.
+     a.	Start the top program.
+     b.	While in the top program, move back to the previous screen.
+22.	Start a new virtual screen session.
+     a.	Start the lynx program and navigate to ccac.edu.
+     b.	While in the lynx program, move back to the previous screen.
+23.	List the virtual consoles.
+     a.	Choose the first one “1”.
+     b.	What screen are you on?
+     c.	Exit the top program, then type the exit command.
+24.	List the virtual consoles again.
+     a.	Choose the second one “2”.
+     b.	What screen are you on?
+     c.	Quit the lynx program, then type the exit command.
+25.	Exit the screen virtual screen session.
+     a.	Type the exit command.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB"
+     chmod 644 "$v_LAB"
+
+     #Answers
+     #2
+     #free
+
+     #3
+     #free -h
+
+     #4
+     #free --lohi
+
+     #6
+     #ps -A | grep lynx
+
+     #7
+     #pstree lynx
+
+     #8
+     #ps -A | grep lab6-01.sh
+
+     #9
+     #kill -9 <PID>
+     #ps -A | grep lab6-01.sh
+     #ps -A | grep lynx
+
+     #11
+     #ps -A | grep lynx
+     #kill <PID>
+     #kill -9 <PID>
+     #ps -A | grep lynx
+     #kill -9 <PID> (MAIN LYNX PID)
+     #ps -A | grep lynx
+     #kill -9 <PID> (SCRIPT PID)
+
+     #13
+     #top
+     #u
+     #labuser1
+     #q
+
+     #14
+     #ps aux | grep lab6-01.sh
+
+     #15
+     #renice <PID> 5
+
+     #16
+     #ps aux | grep lab6-01.sh
+
+     #17
+     #u
+     #labuser1
+     #k
+     #<PID>
+     #9
+
+     #18
+     #pstree labuser1
+
+     #19
+     #screen
+     #[ESC]
+
+     #20
+     #pstree labuser1
+
+     #21
+     #[CTRL]+[A] and [CTRL]+[C]
+     #top
+     #[CTRL]+[A] [P]
+
+     #22
+     #lynx ccac.edu
+     #[CTRL]+[A] [P]
+
+     #23
+     #[CTRL]+[A]+["]
+     #[1]+[ENTER]
+
+     #24
+     #[CTRL]+[A]+["]
+     #[2] + [ENTER]
+}
+
+# CH07 - File Manipulation
+function chapter_seven ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH07"
+     local v_LAB="$v_Working_Directory/LAB7-01"
+
+     # CREATE DIRECTORIES
+     cd /
+     cd labs
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     #chown root:labusers1 "$v_Working_Directory"
+     #chmod 02755 "$v_Working_Directory"
+
+     # CREATE FILE STRUCTURE
+     mkdir "$v_Working_Directory/Christopher Pike"
+     mkdir "$v_Working_Directory/James T. Kirk"
+     mkdir "$v_Working_Directory/Montgomery Scott"
+     mkdir "$v_Working_Directory/Hikaru Sulu"
+     mkdir "$v_Working_Directory/Nyota Uhura"
+
+     mkdir "$v_Working_Directory/Starfleet Federation"
+     # STARFLEET STRUCTURE (Done In Lab).
+     #mkdir "$v_Working_Directory/Starfleet Federation/Federation Ships"
+     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel"
+     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel/Capitans"
+     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel/Officers"
+
+     mkdir "$v_Working_Directory/numbered"
+     #mkdir -p "$v_Working_Directory/numbered/{1..9}/{1..9}"
+
+     mkdir "$v_Working_Directory/difference"
+     mkdir -p "$v_Working_Directory/difference"/{1..3}
+     touch "$v_Working_Directory/difference"/README
+     mkdir -p "$v_Working_Directory/difference/1"/{1..3}
+     touch "$v_Working_Directory/difference/1"/file{1..2}.{txt,html}
+     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/1/file3.html"
+     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/1/file2.html"
+     printf '<head>\nHello Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/1/file3.html"
+     printf '7h3 qu1ck 8r0wn f0x jump5 0ver 7h3 142y d09!\n' > "$v_Working_Directory/difference/1/file3.txt"
+     mkdir -p "$v_Working_Directory/difference/2"/{1..5}
+     touch "$v_Working_Directory/difference/2"/file{1..5}.{txt,html}
+     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/2/file1.html"
+     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/2/file2.html"
+     printf '<head>\nHello Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/2/file3.html"
+     printf '<head>\nGoodbye Eros!\n<\head>\n' > "$v_Working_Directory/difference/2/file4.html"
+     printf '<head>\nGoodbye Athena!\n<\head>\n' > "$v_Working_Directory/difference/2/file5.html"
+     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/2/file4.txt"
+     mkdir -p "$v_Working_Directory/difference/3"/{1..7}
+     touch "$v_Working_Directory/difference/3"/file{1..7}.{txt,html}
+     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/3/file1.html"
+     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/3/file2.html"
+     printf '<head>\nGoodbye Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/3/file3.html"
+     printf '<head>\nHello Eros!\n<\head>\n' > "$v_Working_Directory/difference/3/file4.html"
+     printf '<head>\nGoodbye Athena!\n<\head>\n' > "$v_Working_Directory/difference/3/file5.html"
+     printf '<head>\nHello Hephaestus!\n<\head>\n' > "$v_Working_Directory/difference/3/file6.html"
+     printf '<head>\nGoodbye Ares!\n<\head>\n' > "$v_Working_Directory/difference/3/file7.html"
+     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/3/file1.txt"
+     printf '7h3 qu1ck 8r0wn f0x jump5 0v3r 7h3 142y d09!\n' > "$v_Working_Directory/difference/3/file2.txt"
+     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/3/file4.txt"
+
+     # USS Enterprise Quotes
+     printf "Our mission? We explore. We seek out new life and new civilizations. We boldly go where no one has gone before.\n– Christopher Pike, 2259\n\n" >> "$v_Working_Directory/Christopher Pike/USS Enterprise"
+     printf "All I ask is a tall ship and a star to steer her by.\n– James T. Kirk, 2268" >> "$v_Working_Directory/Christopher Pike/USS Enterprise"
+
+     touch "$v_Working_Directory/Christopher Pike/USS Discovery"
+
+     # Hard Link
+     ln "$v_Working_Directory/Christopher Pike/USS Enterprise" "$v_Working_Directory/James T. Kirk/USS Enterprise"
+
+     # USS Enterprise-A Quotes
+     printf "My friends, we've come home.\n– James T. Kirk, 2286" >> "$v_Working_Directory/James T. Kirk/USS Enterprise-A"
+
+     # USS Excelsior Quotes
+     printf "My God, that's a big ship.\nNot so big as her captain, I think.\n– Leonard McCoy and Montgomery Scott, 2293" >> "$v_Working_Directory/Montgomery Scott/USS Excelsior"
+
+     # Soft Link Enterprise-A from JTK (Done In Lab).
+     #ln -s "$g_LAB_PATH/$v_Working_Directory/James T. Kirk/USS Enterprise-A" "$v_Working_Directory/Montgomery Scott/USS Enterprise-A"
+
+     # Soft Link
+     ln -s "$v_Working_Directory/Montgomery Scott/USS Excelsior" "$v_Working_Directory/Hikaru Sulu/USS Excelsior"
+     touch "$v_Working_Directory/Nyota Uhura/USS Leondegrance"
+
+     # SET SECURITY
+     chown labuser1:labusers1 -R "$v_Working_Directory"/*
+     chmod 00755 -R "$v_Working_Directory"/*
+
+     # Move Capitans to Capitans (Done In Lab)
+     #mv "$v_Working_Directory/Christopher Pike" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
+     #mv "$v_Working_Directory/James T. Kirk" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
+     #mv "$v_Working_Directory/Montgomery Scott" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
+     #mv "$v_Working_Directory/Hikaru Sulu" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
+     #mv "$v_Working_Directory/Nyota Uhura" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
+     #rm "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise"
+     #rm "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
+
+     # USS Discovery
+     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Discovery" "$v_Working_Directory/Starfleet Federation/Federation Ships/"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Discovery" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
+
+     # USS Enterprise
+     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Federation Ships"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
+
+     # USS Enterprise-A
+     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise-A" "$v_Working_Directory/Starfleet Federation/Federation Ships"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise-A" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
+
+     # USS Excelsior
+     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Montgomery Scott/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Federation Ships"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Montgomery Scott/"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/"
+
+     # USS Leondegrance
+     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Nyota Uhura/USS Leondegrance" "$v_Working_Directory/Starfleet Federation/Federation Ships"
+     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Leondegrance" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Nyota Uhura/"
+
+     # Searching (Done In Lab).
+     #find /labs/CH07/difference/ -iname *.html | tree
+
+     #find /labs/CH07/difference/ -name *.html -exec grep -iw Hello {} \;
+     #find /labs/CH07/difference/ -name *.html -exec grep -iw Zeus {} \;
+     #find /labs/CH07/difference/ -name *.html -exec grep -iw Aphrodite {} \;
+     #find /labs/CH07/difference/ -name *.html -exec grep -iw "<head>" {} \;
+
+     #find /labs/CH07/difference/ -name *.txt -exec grep -iw fox {} \;
+     #find /labs/CH07/difference/ -name *.txt -exec grep -iw 7h3 {} \;
+
+     # CREATE LAB - SET PERMISSIONS
+cat > "$v_LAB" << EOF
+LAB:		    LAB07-01
+OBJECTIVE:    The objective of this lab is to learn how to navigate, create and delete files and folders, symbolic links, and structure from the command line.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH07 folder.
+
+1.	Change into the '/labs/CH07' folder.
+
+TREES AND FILE LISTINGS
+2.	Using the tree command, map the structure of the CH07 folder.
+3.	Interrogate each folder:
+     a.	What are these folders' groups and user ownership?
+     b.	Are there any symbolic links?
+     c.	What do those links look like?
+4.	Interrogate the inodes of the files in the Hikaru Sulu and Montgomery Scott folders.
+     a.	What is the inode of the USS Excelsior file in both folders?
+     b.	What kind of link is this?
+     c.	What do you notice about the pathname of the symbolic link in the Hikaru Sulu folder?
+5.	Interrogate the inodes of the files in the Christopher Pike and James T. Kirk folders.
+     a.	What is the inode of the USS Enterprise file in both folders?
+     b.	What kind of link is this?
+6.	Navigate to the 'Montgomery Scott' folder.
+     a.	Create a link to the USS Enterprise-A in the James T. Kirk folder.
+7.	Navigate to the Nyota Uhura folder.
+     a.	Using the touch command, update the date and time stamp of the USS Leondegrance file to January 1, 2288.
+b.	Create an empty file called USS Gallant in this folder.
+
+CREATING FOLDERS
+8.	Create the following folder structure under the 'Starfleet Federation' folder.
+     Starfleet Federation/
+     |-- Federation Ships
+     \-- Personnel
+         |-- Captains
+         \-- Officers
+         a.	How many commands did you type?
+9.	Remove the Personnel directory.
+ 
+10.	Create nine directories in the numbered directory numbered one through nine, with nine sub-directories numbered one through nine in each.
+numbered
+     |-- 1
+     |   |-- 1
+     |   .
+     |   .
+     |   .
+     |   \--9
+     .
+     .
+     .
+     \--9
+        |-- 1
+        |-- 2
+        |-- 3
+        .
+        .
+        .
+        \--9
+        a.	Were you able to create it using one command?
+
+DIFFERENCE
+11.	Using the diff command, what is the difference between directories one through three?
+
+MOVING AND REMOVING OBJECTS
+12.	From the root of the CH07 folder, move the Starfleet captains under the Starfleet Federation/Personnel/Capitans folder.
+13.	Under each Starfleet Captain, move the ship file under the Starfleet Federation/Federation Ships folder and create a symbolic link under each Captain to their ship.  Use the diagram (below) to help you.
+
+NOTE: Recall that the USS Enterprise under James T. Kirk is a hard link, and the USS Excelsior is a soft link or symbolic-link under Hikaru Sulu. Remove these links first, then recreate them once the ship has been moved to the 'Federation Ships' directory.
+
+     /Starfleet Federation/
+     |-- Federation Ships
+     |   |-- USS Discovery
+     |   |-- USS Enterprise
+     |   |-- USS Enterprise-A
+     |   |-- USS Excelsior
+     |   \--USS Leondegrance
+     \--Personnel
+        |-- Captains
+        |   |-- Christopher Pike
+        |   |   |-- USS Discovery -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Discovery
+        |   |   \--USS Enterprise -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Enterprise
+        |   |-- Hikaru Sulu
+        |   |   \--USS Excelsior -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Excelsior
+        |   |-- James T. Kirk
+        |   |   |-- USS Enterprise -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Enterprise
+        |   |   \--USS Enterprise-A -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Enterprise-A
+        |   |-- Montgomery Scott
+        |   |   \--USS Excelsior -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Excelsior
+        |   \--Nyota Uhura
+        |       \--USS Leondegrance -> /Lab Files/CH07-A/Starfleet Federation/Federation Ships/USS Leondegrance
+        \--Officers
+ 
+SEARCHING
+14.	Find all text files in the difference directory and sub-directories. Once done, pipe the output to the tree command.
+15.	Find all .html files in the difference directory and sub-directories with the word:
+     a.	"Hello" in them.
+     b.	"Zeus" in them.
+     c.	"Aphrodite" in them.
+     d.	"<head>" in them.
+16.	Find all .txt files in the difference directory and sub-directories with the word:
+     a.	"fox" in them.
+     b.	"7h3" in them.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB"
+     chmod 644 "$v_LAB"
+}
+
+# CH08 - File Processing
+function chapter_eight ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH08"
+     local v_LAB="$v_Working_Directory/LAB8-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 00754 "$v_Working_Directory"
+
+     # HE WHO SHALL NOT BE NAMED
+     printf '#!/bin/bash\n\n' >> "$v_Working_Directory/hwsnbn.sh"
+     printf "sed -i 's/Tom Marvolo Riddle/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$v_Working_Directory/hwsnbn.sh"
+     printf "sed -i 's/Lord Voldemort/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$v_Working_Directory/hwsnbn.sh"
+     chown root:root "$v_Working_Directory/hwsnbn.sh"
+     chmod 00700 "$v_Working_Directory/hwsnbn.sh"
+     sed -i '23 i 1  *    * * *   root    /labs/CH08/hwsnbn.sh' /etc/crontab
+
+# Frankenstein Letter
+cat > "$v_Working_Directory/frankenstein-letter.txt" << EOF
+To Mrs. Saville, England
+St. Petersburgh, Dec. 11th, 17—
+
+You will rejoice to hear that no disaster has accompanied
+the commencement of an enterprise which you have regard-
+ed with such evil forebodings. I arrived here yesterday, and
+my first task is to assure my dear sister of my welfare and
+increasing confidence in the success of my undertaking.
+I am already far north of London, and as I walk in the
+streets of Petersburgh, I feel a cold northern breeze play
+upon my cheeks, which braces my nerves and fills me
+with delight. Do you understand this feeling? This breeze,
+which has travelled from the regions towards which I am
+advancing, gives me a foretaste of those icy climes. Inspir-
+ited by this wind of promise, my daydreams become more
+fervent and vivid. I try in vain to be persuaded that the
+pole is the seat of frost and desolation; it ever presents it-
+self to my imagination as the region of beauty and delight.
+
+There, Margaret, the sun is forever visible, its broad disk just
+skirting the horizon and diffusing a perpetual splendour.
+There—for with your leave, my sister, I will put some trust
+in preceding navigators— there snow and frost are ban-
+ished; and, sailing over a calm sea, we may be wafted to
+
+a land surpassing in wonders and in beauty every region
+hitherto discovered on the habitable globe. Its productions
+and features may be without example, as the phenomena of
+the heavenly bodies undoubtedly are in those undiscovered
+solitudes. What may not be expected in a country of eter-
+nal light? I may there discover the wondrous power which
+attracts the needle and may regulate a thousand celestial
+observations that require only this voyage to render their
+seeming eccentricities consistent forever. I shall satiate my
+ardent curiosity with the sight of a part of the world never
+before visited, and may tread a land never before imprinted
+by the foot of man. These are my enticements, and they are
+sufficient to conquer all fear of danger or death and to in-
+duce me to commence this labourious voyage with the joy
+a child feels when he embarks in a little boat, with his holi-
+day mates, on an expedition of discovery up his native river.
+
+But supposing all these conjectures to be false, you cannot
+contest the inestimable benefit which I shall confer on all
+mankind, to the last generation, by discovering a passage
+near the pole to those countries, to reach which at present
+so many months are requisite; or by ascertaining the secret
+of the magnet, which, if at all possible, can only be effected
+by an undertaking such as mine.
+
+These reflections have dispelled the agitation with which
+I began my letter, and I feel my heart glow with an enthu-
+siasm which elevates me to heaven, for nothing contributes
+so much to tranquillize the mind as a steady purpose—a
+point on which the soul may fix its intellectual eye. This
+expedition has been the favourite dream of my early years.
+
+I have read with ardour the accounts of the various voyag-
+es which have been made in the prospect of arriving at the
+North Pacific Ocean through the seas which surround the
+pole. You may remember that a history of all the voyages
+made for purposes of discovery composed the whole of our
+good Uncle Thomas’ library. My education was neglected,
+yet I was passionately fond of reading. These volumes were
+my study day and night, and my familiarity with them in-
+creased that regret which I had felt, as a child, on learning
+that my father’s dying injunction had forbidden my uncle to
+allow me to embark in a seafaring life.
+
+These visions faded when I perused, for the first time,
+those poets whose effusions entranced my soul and lifted
+it to heaven. I also became a poet and for one year lived in
+a paradise of my own creation; I imagined that I also might
+obtain a niche in the temple where the names of Homer and
+Shakespeare are consecrated. You are well acquainted with
+my failure and how heavily I bore the disappointment. But
+just at that time I inherited the fortune of my cousin, and
+my thoughts were turned into the channel of their earlier
+bent.
+
+Six years have passed since I resolved on my present
+undertaking. I can, even now, remember the hour from
+which I dedicated myself to this great enterprise. I com-
+menced by inuring my body to hardship. I accompanied
+the whale-fishers on several expeditions to the North Sea; I
+voluntarily endured cold, famine, thirst, and want of sleep;
+I often worked harder than the common sailors during the
+day and devoted my nights to the study of mathematics, the
+theory of medicine, and those branches of physical science
+from which a naval adventurer might derive the greatest
+practical advantage. Twice I actually hired myself as an un-
+der-mate in a Greenland whaler, and acquitted myself to
+admiration. I must own I felt a little proud when my captain
+offered me the second dignity in the vessel and entreated
+me to remain with the greatest earnestness, so valuable did
+he consider my services.
+
+And now, dear Margaret, do I not deserve to accomplish
+some great purpose? My life might have been passed in
+ease and luxury, but I preferred glory to every enticement
+that wealth placed in my path. Oh, that some encouraging
+voice would answer in the affirmative! My courage and my
+resolution is firm; but my hopes fluctuate, and my spirits
+are often depressed. I am about to proceed on a long and
+difficult voyage, the emergencies of which will demand all
+my fortitude: I am required not only to raise the spirits of
+others, but sometimes to sustain my own, when theirs are
+failing.
+
+This is the most favourable period for travelling in Russia.
+They fly quickly over the snow in their sledges; the motion is
+pleasant, and, in my opinion, far more agreeable than that
+of an English stagecoach. The cold is not excessive, if you
+are wrapped in furs— a dress which I have already adopted,
+for there is a great difference between walking the deck and
+remaining seated motionless for hours, when no exercise
+prevents the blood from actually freezing in your veins. I
+have no ambition to lose my life on the post-road between
+St. Petersburgh and Archangel.
+
+I shall depart for the latter town in a fortnight or three
+weeks; and my intention is to hire a ship there, which can
+easily be done by paying the insurance for the owner, and
+to engage as many sailors as I think necessary among those
+who are accustomed to the whale-fishing. I do not intend
+to sail until the month of June; and when shall I return?
+
+Ah, dear sister, how can I answer this question? If I suc-
+ceed, many, many months, perhaps years, will pass before
+you and I may meet. If I fail, you will see me again soon, or
+never.
+
+Farewell, my dear, excellent Margaret. Heaven shower
+down blessings on you, and save me, that I may again and
+again testify my gratitude for all your love and kindness.
+
+Your affectionate brother,
+R. Walton
+EOF
+
+# lorem-ipsum
+cat > "$v_Working_Directory/lorem-ipsum.txt" << EOF
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+culpa qui officia deserunt mollit anim id est laborum.
+
+Nor is there anyone who loves or pursues or desires to obtain niap of itself,
+because it is niap, but occasionally secnatsmucric occur in hcihw toil dna niap
+can procure him some great pleasure.
+
+Roman Philosopher, Cicero
+EOF
+
+# numbers
+cat > "$v_Working_Directory/numbers.txt" << EOF
+22
+67
+189
+13
+88
+99
+3
+15
+8
+68
+113
+74
+9
+58
+77
+19
+115
+34
+100
+91
+EOF
+
+# starfleet-ships
+cat > "$v_Working_Directory/starfleet-ships.txt" << EOF
+Danube-class,USS Rubicon,NCC-72936
+unknown,USS Farouk El-Baz,NCC-31823
+Renaissance-class,USS Hornet,NCC-45231
+Nebula-class,USS Sutherland,NCC-72015
+unknown,USS Endeavour,NCC-71805
+unknown,USS Whorfin,NCC-1024
+Merced-class,USS Trieste,NCC-37124
+unknown,USS Merrimac,NCC-1715
+Prometheus-class,USS Prometheus,NX-59650
+Transport ship,USS Constantinople,NCC-43622
+Inquiry-class,USS Rustazh,NCC-86503
+New Orleans-class,USS Thomas Paine,NCC-65530
+Sagan-class,USS Stargazer,NCC-82893
+Galaxy-class,USS Odyssey,NCC-71832
+Dreadnought,USS Entente,NCC-2120
+Apollo-class,USS Ajax,NCC-11574
+Walker-class,USS Shenzhou,NCC-1227
+California-class,USS Oakland,NCC-75012
+Constitution-class,USS Potemkin,NCC-1657
+Sovereign-class,USS Pachacuti,NCC-74181
+unknown,unknown,NCC-31054
+Merian-class,USS Mitchell,NCC-325027
+unknown,USS Endeavour,NCC-25330
+unknown,USS Omaha Nebraska,NCC-5252
+Galaxy-class,USS Yamato,NCC-71807
+Dresselhaus-type,USS Dresselhaus,NCC-325019
+unknown,USS Exeter,NCC-26531
+Ambassador-class,USS Yamaguchi,NCC-26510
+Excelsior-class,USS Repulse,NCC-2544
+Miranda-class,USS ShirKahr,NCC-31905
+Inquiry-class,USS Nathan Hale,NCC-86501
+unknown,USS Nobel,NCC-55012
+unknown,unknown,NCC-71325
+unknown,USS Atlantis,NCC-72007
+Danube-class,USS Ganges,NCC-72454
+Antares-type,Woden,NCC-325
+Inquiry-class,USS Magellan,NCC-86509
+Nebula-class,USS Bonchune,NCC-70915
+unknown,USS Atlantis,NCC-32710
+Federation mission scoutship,unknown,NCC-75227
+Akira-class,USS Thunderchild,NCC-63549
+unknown,USS Tecumseh,NCC-14934
+Nimitz-class,USS Europa,NCC-1648
+Luna-class,USS Titan,NCC-80102
+Freedom-class,USS Franklin,NX-326
+California-class,USS Cerritos,NCC-75567
+unknown,USS Tikhov,NCC-1067-M
+Nebula-class,USS Bellerophon,NCC-62048
+Constitution-class,USS Korolev,NCC-2014
+Sovereign-class,USS Gilgamesh,NCC-74669
+Obena-class,USS Archimedes,NCC-83002
+Ambassador-class,USS Excalibur,NCC-26517
+Defiant-class,USS Sao Paulo,NCC-75633
+Curry-type,Raging Queen,NCC-42264
+unknown,unknown,NCC-1831
+Sutherland-class,USS Ibn al-Haytham,NCC-91965
+Nebula-class,USS Monitor,NCC-61826
+Constellation-class,USS Hathaway,NCC-2593
+Sovereign-class,USS Venture,NCC-75306
+Constitution-class,USS Enterprise-A,NCC-1701-A
+Yeager-type,USS Yeager,NCC-65674
+Ptolemy-class,unknown,NCC-3801
+Antares-type,Antares,NCC-501
+New Orleans-class,USS Kyushu,NCC-65491
+Excelsior-class,USS Valley Forge,NCC-43305
+unknown,USS Wellington,NCC-33821
+Springfield-class,USS Chekov,NCC-57302
+Reliant-class,USS Uhura,NCC-90214
+Sovereign-class,USS Okuda,NCC-74107
+Oberth-class,USS Oberth,NCC-602
+Inquiry-class,USS Zheng He,NCC-86505
+unknown,USS Equicon,NCC-1988
+Excelsior-class,USS Excelsior,NCC-2000
+Sutherland-class,USS Huygens,NCC-91814
+Nebula-class,USS Prometheus,NCC-71201
+Oberth-class,USS Tsiolkovsky,NCC-53911
+Constitution-class,USS Endeavour,NCC-1895
+Sovereign-class,USS Hrothgar,NCC-74975
+Antares-type,Yorkshire,NCC-330
+Credence-type,USS Credence,NCC-2804
+Korolev-class,USS Goddard,NCC-59621
+Excelsior-class,USS Melbourne,NCC-62043
+Inquiry-class,USS Shackleton,NCC-86517
+unknown,USS Non Sequitur,NCC-12999
+Excelsior-class,USS Lakota,NCC-42768
+Constellation-class,USS Constellation,NX-1974
+Galaxy-class,USS Venture,NCC-71854
+Constitution-class,USS Hood,NCC-1703
+Apollo-class,USS Clement,NCC-12537
+Curry-type,USS Curry,NCC-42254
+Miranda-class,USS Antares,NCC-9844
+Shepard-class,USS Gagarin,NCC-1309
+unknown,USS Max Plank,NCC-28573
+Renaissance-class,USS Aries,NCC-45167
+Challenger-class,USS Buran,NCC-57580
+Daedalus-class,USS Essex,NCC-173
+Constitution-class,USS Ahwahnee,NCC-2048
+unknown,USS Gremlin,NCC-72927
+Oberth-class,USS Grissom,NCC-638
+Oberth-class,USS Cochrane,NCC-59318
+Defiant-class,USS Valiant,NCC-74210
+unknown,USS Apollo,NCC-30000
+Constitution-class,USS Exeter,NCC-1672
+California-class,USS Solvang,NCC-12101
+unknown,unknown,NCC-1697
+Constitution-class,USS Emden,NCC-1856
+Eisenberg-class,USS Nog,NCC-325070
+Ross-class,USS Yi Sun-Sin,NCC-76545
+unknown,USS Kelvin,NCC-0514
+Excelsior II-class,USS Eureka,NCC-42023
+unknown,USS Archer,NCC-627
+Galaxy-class,USS Galaxy,NCC-70637
+Bonaventure-type,Bonaventure,10281NCC
+Hiawatha-type,USS Hiawatha,NCC-815
+Nebula-class,USS Honshu,NCC-60205
+Reliant-class,USS Reliant,NCC-90200
+Crossfield-class,USS Glenn,NCC-1030
+unknown,USS John Muir,NCC-1732
+Sovereign-class,USS Van Citters,NCC-72504
+Luna-class,USS Europa,NCC-80104
+Cheyenne-class,USS Ahwahnee,NCC-71620
+Nebula-class,USS Phoenix,NCC-65420
+California-class,USS Carlsbad,NCC-73110
+unknown,USS Eagle,NCC-956
+unknown,USS Akagi,NCC-62158
+unknown,unknown,NCC-31810
+California-class,USS Vacaville,NCC-72707
+Crossfield-class,USS Discovery,NCC-1031
+Sovereign-class,USS Valkyrie,NCC-74877
+Crossfield-class (refit),USS Discovery,NCC-1031-A
+Defiant-class,USS Defiant,NX-74205
+unknown,USS Hokule'a,NCC-31087
+Danube-class,USS Rio Grande,NCC-72452
+Luna-class,USS Oberon,NCC-80103
+unknown,unknown,NCC-1685
+unknown,USS Challenger,NCC-2032
+Antares-type,unknown,NCC-502
+unknown,USS Excelsior,NCC-21445
+unknown,USS Neil Armstrong,NCC-31806
+Sutherland-class,USS Almagest,NCC-91870
+unknown,USS Heart of Gold,NCC-42
+Parliament-class,USS Vancouver,NCC-70492
+unknown,unknown,NCC-30532
+Alka-Selsior-type,USS Alka-Selsior,NCC-1404
+Excelsior-class,USS Berlin,NCC-14232
+unknown,USS Tripoli,NCC-19386
+Niagara-class,USS Princeton,NCC-59804
+unknown,USS Voyager,NCC-74656-J
+Constitution-class,USS Enterprise,NCC-1701
+Lancelot-class,USS Leondegrance,NCC-2176
+unknown,USS Archer,NCC-44278
+Engle-class,USS T'Plana-Hath,NCC-1004
+Sombra-class,USS Peregrine,NCC-1549
+Oberth-class,USS Yosemite,NCC-19002
+Intrepid-class,USS Voyager,NCC-74656
+unknown,USS Da-Teplan,NCC-30087
+Centaur-type,USS Centaur,NCC-42043
+Galaxy-class,USS Challenger,NCC-71099
+Excelsior-class,USS Charleston,NCC-42285
+Nova-class,USS Equinox,NCC-72381
+Oberth-class,USS Pegasus,NCC-53847
+Constellation-class,USS Stargazer,NCC-2893
+Miranda-class,USS Brattain,NCC-21166
+Miranda-class,USS Reliant,NCC-1864
+Danube-class,USS Shenandoah,NCC-73024
+unknown,USS Nova,NCC-73515
+Constitution-class,USS Intrepid,NCC-1631
+Reliant-class,USS Clark,NCC-90206
+unknown,USS Endeavour,NCC-39272
+Ross-class,USS Vanguard,NCC-75148
+Constellation-class,USS Victory,NCC-9754
+unknown,unknown,NCC-85343[4]
+unknown,USS Wyoming,NCC-43730
+Magee-class,USS Shran,NCC-1413
+Danube-class,unknown,NCC-73918
+Elkins-type,USS Elkins,NCC-74121
+Miranda-class,USS Saratoga,NCC-1887
+Ambassador-class,USS Zhukov,NCC-26136
+Courage-class,USS Song,NCC-325084
+Miranda-class,USS Tian An Men,NCC-21382
+Class F shuttlecraft,unknown,NCC-K7
+unknown,USS Liberator,NCC-67016
+Constellation-class,unknown,NCC-7100
+unknown,USS Republic,NCC-1371
+Miranda-class,USS Lantree,NCC-1837
+Scout,USS Revere,NCC-595
+Miranda-class,USS Majestic,NCC-31060
+Ambassador-class,USS Enterprise,NCC-1701-C
+Oberth-class,USS Raman,NCC-29487
+Sovereign-class,USS Arsinoe,NCC-75307
+Sydney-class,USS Jenolan,NCC-2010
+Excelsior-class,USS Fredrickson,NCC-42111
+unknown,USS Tycho,NCC-85103
+Hermes-class,unknown,NCC-585
+unknown,USS Intrepid,NCC-38907
+Sovereign-class,USS Hutchinson,NCC-74957
+unknown,USS Kongo,NCC-1710
+unknown,unknown,NCC-85183[3]
+Constitution-class (31st century),USS Noble,NCC-325002
+unknown,USS Sherlock Holmes,NCC-221B
+Nebula-class,USS Leeds,NCC-70352
+unknown,USS Ticonderoga,NCC-87270
+Intrepid-class,USS Intrepid,NCC-74600
+unknown,USS Constellation,NCC-55817
+unknown,unknown,NCC-77567
+Norway-class,USS Budapest,NCC-64923
+Miranda-class,USS Saratoga,NCC-31911
+Soyuz-class,USS Bozeman,NCC-1941
+Dauntless-class,USS Dauntless,NCC-80816
+Excelsior-class,USS Fearless,NCC-14598
+Gagarin-class,USS Gagarin,NCC-97930
+Constitution-class,unknown,NCC-1700
+Hansando-type,USS Hansando,NCC-325072
+Protostar-type,USS Protostar,NX-76884
+California-class,USS Merced,NCC-87075
+Malachowski-class,USS Clarke,NCC-1661
+Antares-type,unknown,NCC-G1465[1]
+Oberth-class,USS Bonestell,NCC-31600
+Intrepid-class,USS Bellerophon,NCC-74705
+Luna-class,USS Luna,NCC-80101
+unknown,USS Nightwing,NCC-8342
+Nebula-class,USS Merrimac,NCC-61827
+Huron-type,USS Huron,NCC-F1913
+Saber-class,USS Yeager,NCC-61947
+Curiosity-class,USS Ibn Majid,NCC-75710
+unknown,USS Copernicus,NCC-58637
+unknown,USS Unicorn,NCC-85117
+Akira-class,USS Avalon,NCC-63887
+unknown,USS Scovill,NCC-1598
+Saladin-class,unknown,NCC-500
+Sovereign-class,USS Enterprise,NCC-1701-E
+unknown,USS Valiant,NCC-75418
+Excelsior-class,USS Hood,NCC-42296
+unknown,USS Helin,NCC-1692
+Excelsior-class,USS Potemkin,NCC-18253
+unknown,USS Yuri Gagarin,NCC-25306
+Constitution-class,USS Excalibur,NCC-1664
+unknown,USS Excalibur,NCC-21534
+Miranda-class,USS Trial,NCC-1948
+unknown,USS Ganymede,NCC-18451
+unknown,unknown,NCC-21335
+unknown,USS Giacconi,NCC-316608
+unknown,USS Saratoga,NCC-31640
+Constitution-class (31st century),USS Armstrong,NCC-317856
+Excelsior II-class,USS Excelsior,NCC-42037
+unknown,USS Yorktown,NCC-20045
+Nebula-class,USS Lexington,NCC-30405
+Constitution-class (31st century),USS Excalibur,NCC-1664-M
+Nebula-class,USS Farragut,NCC-60597
+California-class,USS Rubidoux,NCC-12109
+Daedalus-class,USS Horizon,NCC-176
+unknown,USS Zapata,NCC-33184
+unknown,unknown,NCC-1718
+unknown,USS Hermes,NCC-10376
+Shepard-class,USS Kerala,NCC-1255
+Galaxy-class,USS Enterprise,NCC-1701-D
+Constitution-class,USS Lexington,NCC-1709
+Sutherland-class,USS Sutherland,NCC-91800
+Cardenas-class,USS Yeager,NCC-1437
+unknown,USS Aleo,NCC-1981
+Bradbury-class,USS Bradbury,NX-72307
+Constitution-class,USS Defiant,NCC-1764
+Akira-class,USS Helios,NCC-63284
+Transport Container,unknown,NCC-4000
+Steamrunner-class,USS Appalachia,NCC-52136
+unknown,USS Sarajevo,NCC-38529
+Scout,USS Columbia,NCC-621
+Excelsior-class,USS Enterprise-B,NCC-1701-B
+Osler-type,Osler,NX-75300
+unknown,unknown,NCC-19585[2]
+Constitution-class,USS Constellation,NCC-1017
+Hoover-class,USS Edison,NCC-1683
+Sydney-class,USS Nash,NCC-2010-5
+California-class,USS Alhambra,NCC-75256
+Akira-class,USS Rabin,NCC-63293
+Oberth-class,USS Copernicus,NCC-640
+unknown,USS Springfield,NCC-1963
+Miranda-class,USS Nautilus,NCC-31910
+EOF
+
+# wizard-names
+cat > "$v_Working_Directory/wizard-names.txt" << EOF
+Harry Potter
+Minerva McGonagall
+Albus Dumbledore
+Neville Longbottom
+Sirius Black
+Dennis Creevey
+Ron Weasley
+Hermione Granger
+Remus Lupin
+Draco Malfoy
+Alastor (Mad-Eye) Moody
+Newt Scamander
+EOF
+
+# written-numbers
+cat > "$v_Working_Directory/writen-numbers.txt" << EOF
+one
+two
+three
+four
+five
+six
+seven
+eight
+nine
+ten
+EOF
+
+# written-numbers-search
+cat > "$v_Working_Directory/writen-numbers-search.txt" << EOF
+one
+three
+eight
+twenty
+EOF
+
+     #15b (Done In Lab)
+     #awk -F ',' '{$3,$2,$1}' starfleet-ships.txt
+
+     #15c (Done In Lab)
+     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V
+
+     #15d (Done In Lab)
+     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Constitution-class (31st century)"
+
+     #15e (Done In Lab)
+     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Enterprise"
+
+     #15f (Done In Lab)
+     #awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c
+
+     #15g (Done In Lab)
+     #tr [:lower:] [:upper:] < starfleet-ships.txt | awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' | sort -V
+
+     #16b (Done In Lab)
+     #sed -e 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
+
+     #17b (Done In Lab)
+     #sed -i 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
+
+     #20 (Done In Lab)
+     #fgrep -f written-numbers-search.txt written-numbers.txt
+
+     # CREATE LAB - SET PERMISSIONS
+cat > "$v_LAB" << EOF
+LAB:		  LAB08-01
+OBJECTIVE:  The objective of this lab is to learn how to work with files using the commands we learned from the book; we will do so using the files listed below.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH08 folder.
+
+LIST THAT FILE
+1.	Using the cat command, list the contents of the frankenstein-letter.txt
+	a.	Did the entire contents of the letter fit on the screen?
+2.	Using the tac command, list the contents of the frankenstein-letter.txt
+	a.	What changed?
+3.	Using the more command, list the contents of the frankenstein-letter.txt
+	a.	Were you able to read the contents of the file this time?
+     b.	What key did you use to skip to the next text screen?
+4.	Using the less command, list the contents of the frankenstein-letter.txt
+	a.	Were you able to read the contents of the file this time?
+	b.	What key did you use to skip to the next text screen?
+	c.	What did the arrow keys do?
+	d.	Exit less.
+5.	Using the nl command, number the individual lines of the frankenstein-letter.txt and pipe it to the less command.
+	a.	What word does line fifty-six start with?
+     b.	Exit nl.
+
+HEADS AND TAILS
+6.	Using the head command, list the first ten lines of the frankenstein-letter.txt
+	a.	What was the syntax of the command?
+	b.	How did this command differentiate from the head command without the additional n switch?
+7.	Using the tail command, list the last eight lines of the frankenstein-letter.txt
+	a.	What was the syntax of the command?
+8.	Using the head command, start on line forty of the frankenstein-letter.txt and pipe the output to tail.
+	a.	What was the first line shown?
+	b.	What was the last line shown?
+ 
+SORTING ALPHABETICAL
+9.	Using the cat command, list the contents of the wizard-names.txt
+	a.	Is this list organized?
+10.	Using the sort command, list the contents of the wizard-names.txt
+	a.	Is this list organized by first name or last name?
+11.	Using the sort command, this time, list the contents of the wizard-names.txt by the last name.
+	a.	What was the syntax of the command?
+
+SORTING NUMERIC
+12.	Using the cat command, list the contents of the numbers.txt
+	a.	Is this list organized?
+13.	Using the sort command, list the contents of the numbers.txt
+	a.	Is this list organized this time?
+14.	Using the sort command and a switch, list the contents of the numbers.txt
+	a.	Is this list organized this time?
+
+REARRANGING COLUMNS
+15.	Using the cat command, list the contents of the starfleet-ships.txt
+	a.	How is this list organized?
+	     * The file is organized in “Class, Ship Name, Ship Number” order. *
+	b.	Using the awk command, rearrange the file in “Ship Number, Ship Name and Class” order. Removing the comma field separator and replacing it with a fixed-length field.
+
+	     NOTE: This step will require research and will use the BI command.
+
+	c.	BONUS (RESEARCH): sort this list by ship number (Hint: pipe it to a command).
+	d.	How many and what are the names of the Constitution-class (31st century) ships?
+	e.	How many and what are the class names of all ships named the Enterprise?
+	f.	BONUS (RESEARCH): How many ships have an unknown class?
+
+		HINT: Pipe it to the uniq command using a switch.
+
+	g.	Using the tr command, capitalize the entire starfleet-ships.txt file using 15b or 15c as the input.
+ 
+SEARCH AND REPLACE
+16.	Using the cat command, list the contents of the lorem-ipsum.txt file.
+	a.	Did you notice the mis-spellings of 'pain', 'which', 'and' and 'circumstances' in the translation?
+	b.	Using the sed command, change all of the mis-spellings of those words.
+17.	Using the cat command, list the contents of the lorem-ipsum.txt file.
+	a.	Why didn't the changes from the sed command remain?
+	b.	BONUS (RESEARCH): Using the command from 16b, make the spelling changes permanent.
+
+GREP
+18.	Using the cat command, list the contents of the written-numbers.txt file.
+	a.	What do you see?
+19.	Using the cat command, list the contents of the written-numbers-search.txt file.
+	a.	What do you see?
+20.	Using the fgrep command, search for the terms within the written-numbers.txt file.
+	a.	What do you notice?
+ 
+VIM
+21.	Using the vi program, open the wizard-names.txt file.
+	a.	Add Tom Marvolo Riddle after Sirius Black.
+	b.	Add Rubeus Hagrid after Newt Scamander.
+	c.	Move Remus Lupin before Albus Dumbledore.
+	d.	Write the file and quit.
+
+	* Wait exactly one minute before proceeding to the next step. *
+
+22.	Using the cat command, list the contents of the wizard-names.txt file.
+	a.	What do you see?
+	b.	What happened to the line Tom Marvolo Riddle?
+23.	Using the vi command, open the wizard-names.txt file.
+	a.	Delete the line He who shall not be named
+	b.	Add the line Lord Voldemort after Rubeus Hagrid.
+
+	* Wait exactly one minute before proceeding to the next step. *
+
+24.	Using the cat command, list the contents of the wizard-names.txt file.
+	a.	What do you see?
+	b.	What happened to the line Lord Voldemort?
+
+	NOTE: I wrote a script that will change those lines every minute if they are entered. Kinda-Magic?
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB"
+     chmod 644 "$v_LAB"
+}
+
+# CH09 - File Permissions
+function chapter_nine ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH09"
+     local v_LAB1="$v_Working_Directory/LAB09-01/Constellations/LAB09-01"
+     local v_LAB2="$v_Working_Directory/LAB09-01/Constellations/LAB09-02"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02755 "$v_Working_Directory"
+
+     # LAB09-01
+     mkdir -p "$v_Working_Directory/LAB09-01/Constellations"
+     chown labuser1:labusers1 "$v_Working_Directory/LAB09-01/Constellations"
+     chmod 00744 "$v_Working_Directory/LAB09-01/Constellations"
+
+     # Files
+     touch "$v_Working_Directory/LAB09-01/Constellations/andromeda.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/antlia.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/apus.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/aquila.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/ara.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/aries.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/auriga.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/caelum.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/camelopardalis.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/cancer.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/canes.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/'canis minor'.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/'canis major'.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/capricornus.txt"
+     touch "$v_Working_Directory/LAB09-01/Constellations/cassiopeia.txt"
+     chown labuser1:labusers1 -R "$v_Working_Directory/LAB09-01/Constellations/"
+
+     # CREATE LAB09-01 - SET PERMISSIONS
+cat > "$v_LAB1" << EOF
+LAB:        LAB09-01
+OBJECTIVE:  The objective of this lab is to learn how to set UID and GID permissions on files, folders, and sub-folders.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH09/LAB09-01 folder.
+
+APPLY USER GROUP
+1.	Set the Constellations folder group to labusers2 and change into that folder.
+2.	Create a new text file in the Constellations folder called venatici.txt.
+3.	List the files in the Constellations folder.
+     a.	What is the group name of the venatici.txt file?
+     b.	Why?
+     c.	What group name is applied to every other file in this directory?
+4.	Exit the Constellations folder.
+
+RECURSIVELY APPLY USER GROUP
+5.	Recursively set the Constellations folder group to labusers2 and change into that folder.
+6.	List the files in the Constellations folder.
+     a.	What group name is applied to every other file in this directory?
+7.	Create a new text file in the Constellations folder called pleiades.txt.
+8.	List the files in the Constellations folder.
+     a.	What is the group name of the pleiades.txt file?
+     b.	Why?
+9.	Exit the Constellations folder.
+
+STICKY BITS
+10.	Set the group of the Constellations folder to sticky and change into that folder.
+11.	Create a new text file in the Constellations folder called pegasus.txt.
+12.	List the files in the Constellations folder.
+     a.	What is the group name of the pegasus.txt file?
+     b.	Why?
+
+     NOTE:	We only learned about setting group permissions in this lab; you can easily do the same with user permissions. Try it yourself!
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB1"
+     chmod 644 "$v_LAB1"
+
+     # LAB09-02
+     mkdir -p "$v_Working_Directory/LAB09-02/Physicists"
+     chown labuser3:labusers1 "$v_Working_Directory/LAB09-02/Physicists"
+     chmod 00755 "$v_Working_Directory/LAB09-02/Physicists"
+
+     # CREATE FILES
+     touch "$v_Working_Directory/LAB09-02/Physicists/archimedes.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/bohr.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/cox.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/curie.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+     #printf "E=mc2" >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+     #printf "If you can't explain it to a six-year-old, you don't understand it yourself." >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+     #printf "Logic will get you from A to Z; imagination will get you everywhere." >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/faraday.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/feynman.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/galilei.txt"
+     printf "Intelligence is the ability to adapt to change." >> "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
+     #printf "People who boast about their I.Q. are losers." >> "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/kaku.txt"
+     printf "Falling Apple" >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
+     #printf "This must be gravity!" >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
+     #printf "Nature is pleased with simplicity. And nature is no dummy." >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
+     printf "Now, I have become Death, the destroyer of worlds." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
+     #printf "Any man whose errors take ten years to correct is quite a man." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/pascal.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/raman.txt"
+     touch "$v_Working_Directory/LAB09-02/Physicists/tesla.txt"
+
+     # Create script to list all .txt files without extension.
+     printf '#!/bin/bash\n' >> "$v_Working_Directory/LAB09-02/Physicists/physicists-list"
+     printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$v_Working_Directory/LAB09-02/Physicists/physicists-list"
+
+     # SET PERMISSIONS FOR FILES
+     chmod 00660 -R "$v_Working_Directory/LAB09-02/Physicists/"
+     chmod 00750 "$v_Working_Directory/LAB09-02/Physicists/"
+     chown labuser3:labusers1 -R "$v_Working_Directory/LAB09-02/Physicists/"
+
+     # Einstein is editable by labuser3 then labuser2 after security change.
+     chmod 640 "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+     # (Done In Lab)
+     #chmod 660 "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+
+     # Newton is editable by labuser3 and labuser2
+     chown labuser2:labusers1 "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
+
+     # Hawking is only editable by labuser2
+     chmod 00600 "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
+     chown labuser2:labusers1 "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
+
+     # Oppenheimer is editable by labuser3 and labuser2
+     chown labuser2:labusers2 "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
+     #printf "Now, I have become Death, the destroyer of worlds." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
+
+     # CREATE LAB09-02 - SET PERMISSIONS
+cat > "$v_LAB2" << EOF
+LAB:	       LAB09-02
+OBJECTIVE:  The objective of this lab is to learn how to set file permissions.
+
+* You should be logged in as labuser3 with the password of ‘P@$$w0rd’
+* You will switch to the labuser2 account using the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH09/LAB09-02 folder.
+
+1.	Change into the 'Physicists' folder.
+
+EINSTEIN
+2.	Using the groups command, list the groups for labuser1, labuser2, and labuser3.
+3.	Using the vim text editor, open the einstein.txt text file and place the following line of text in that file: "E=mc2" and exit from vim.
+4.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+5.	Using the vim text editor, open the einstein.txt text file and add the following text under the previous line: "If you can't explain it to a six-year-old, you don't understand it yourself," and exit from vim.
+     a.	Were you able to add the text?
+     b.	Why?
+6.	Exit from the labuser2 account.
+7.	Change the permissions on the einstein.txt file granting labuser2 rw permissions; no other permissions should be set.
+8.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+9.	Using the vim text editor, open the einstein.txt text file and add the following line of text under the previous line: "Logic will get you from A to Z; imagination will get you everywhere," and exit from vim.
+     a.	Were you able to add the text?
+     b.	If not, then why?
+10.	Exit from the labuser2 account.
+
+FILES OWNED BY LABUSER2
+11.	Find the physicists whose files are owned by labuser2.
+     a.	How many are there?
+     b.	Who are they?
+ 
+NEWTON
+12.	Using the vim text editor, open the newton.txt text file and add the following line of text under the existing line: "This must be gravity!" and exit from vim.
+     a.	Were you able to add the text?
+     b.	If so, then why?
+13.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+14.	Using the vim text editor, open the newton.txt and add the following text to that file: "Nature is pleased with simplicity. And nature is no dummy," and exit from vim.
+     a.	Were you able to add the text?
+     b.	If so, then why?
+15.	Exit from the labuser2 account.
+
+REMAINING FILES
+16.	Using the vim text editor, open the remaining two files owned by labuser2. In the file, you can edit and add the text under the existing line: "Any man whose errors take ten years to correct is quite a man," and exit from vim.
+     a.	Which file were you able to edit?
+17.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+18.	Add only the permissions needed for labuser3 to edit and save the file that could not be edited in the previous step.
+19.	Exit from the labuser2 account.
+20.	Using the vim text editor, open the remaining unedited files owned by labuser2.  Add the following text under the existing line: "People who boast about their I.Q. are losers," and exit from vim.
+     a.	Were you able to update the file this time?
+     b.	Why?
+
+LISTING GROUPS
+21.	Type the following command: "id -nG labuser3"
+     a.	What groups is labuser3 a member of?
+22.	Type the following command: "id -nG labuser2"
+     a.	What groups is labuser2 a member of?
+ 
+EXECUTABLE FLIES
+23.	Type the following command: "cat physicists-list"
+     a.	What does it look like this file does?
+24.	Type the following command: “./physicists-list”
+     a.	What happened?
+25.	Add the execute permission to the user and group of the physicists-list file. Then Type the following command: “./physicists-list” again.
+     a.	What happened?
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB2"
+     chmod 644 "$v_LAB2"
+}
+
+#CH10 - SELinux and AppArmor (No Labs)
+function chapter_ten ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH10"
+     local v_LAB="$v_Working_Directory/LAB10-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+#CH11 - File Compression and Storage
+function chapter_eleven ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH11"
+     local v_LAB="$v_Working_Directory/LAB11-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+     #chown labuser1:labusers1 "$v_Working_Directory"
+
+     # CREATE THE ZOO
+     mkdir "$v_Working_Directory/Pittsburgh Zoo"
+
+     touch "$v_Working_Directory/Pittsburgh Zoo/Aardvark"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Anteater"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Beaver"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Camel"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Donkey"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Eland"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Giraffe"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Grizzly Bear"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Kangaroo"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Lemur"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Red Panda"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Sloth"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Tiger"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Wolf"
+     touch "$v_Working_Directory/Pittsburgh Zoo/Zebra"
+
+     cd "$v_Working_Directory"
+     tar -czf pghzoo.tar.gz "Pittsburgh Zoo" 2>/dev/null
+     rm -r "$v_Working_Directory/Pittsburgh Zoo/"
+
+     #1 (Done In Lab)
+     # tar -lf pghzoo.tar.gz
+
+     #2 (Done In Lab)
+     # tar -xvf pghzoo.tar.gz
+
+     #4 (Done In Lab)
+     # rm pghzoo.tar.gz
+
+     #5 (Done In Lab)
+     # cd "Pittsburgh Zoo"
+     # touch Lion
+     # touch "Black Bear"
+     # touch Chimpanzee
+
+     #6 (Done In Lab)
+     # tar -czvf pghzoo.tar.gz "Pittsburgh Zoo"
+
+     #7 (Done In Lab)
+     # zip -r pghzoo.zip "Pittsburgh Zoo"/
+     # unzip -l pghzoo.zip
+
+     # CREATE LAB - SET PERMISSIONS
+cat > "$v_LAB" << EOF
+LAB:	       LAB11-01
+OBJECTIVE:  The objective of this lab is to learn how to work with file compression and storage.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH11 folder.
+
+UNCOMPRESS ARCHIVE
+1.	Using the tar command, list the contents of the pghzoo.tar.gz archive.
+     a.	What did you notice?
+     b.	What options did you use?
+2.	Using the tar command, uncompress the pghzoo.tar.gz archive verbosely.
+     a.	What did you notice?
+3.	List the contents of the CH11/Pittsburgh Zoo folder.
+     a.	Who is the owner of the files, and what are the permissions?
+     b.	What are the permissions of the CH11 folder?
+4.	Remove the pghzoo.tar.gz archive file.
+5.	Go into the Pittsburgh Zoo folder.
+     a.	Using the touch command, create a file called 'Lion'
+     b.	Using the touch command, create a file called 'Black Bear'
+     c.	Using the touch command, create a file called 'Chimpanzee'
+     d.	Change from the Pittsburgh Zoo folder.
+
+CREATE A TARBALL
+6.	From the CH11 folder, create a new archive of the Pittsburgh Zoo folder, use the verbose switch and ensure that you gzip the file. Use the same filename as before pghzoo.tar.gz
+     a.	Ensure the new archive has all of the new files.
+     b.	Remove the Pittsburgh Zoo folder.
+     c.	Restore your archive.
+     d.	Are the three new file you created in the Pittsburgh Zoo folder?
+
+COMPRESS A DIRECTORY AND FILES
+7.	From the CH11 folder, create a compressed file containing the Pittsburgh Zoo folder. Use pghzoo.zip as the filename.
+     a.	What do you notice?
+     b.	Use the "unzip" command to list the contents of the 'pghzoo.zip' archive.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+     chown root:labusers1 "$v_LAB"
+     chmod 644 "$v_LAB"
+}
+
+#CH12 - User and Group Management - TODO: LAB12-02
+function chapter_twelve ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH12"
+     local v_LAB1="$v_Working_Directory/LAB12-01"
+     local v_LAB2="$v_Working_Directory/LAB12-02"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+     #chown labuser1:labusers1 "$v_Working_Directory"
+
+     # CREATE LAB12-1 - SET PERMISSIONS
+cat > "$v_LAB1" << EOF
+LAB:	       LAB12-01
+OBJECTIVE:  The objective of this lab is to learn how to work with users and groups.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH12 folder.
+
+LEARNING ABOUT USERS
+1.	Using the getent command, interrogate the passwd database for labuser1.
+     a.	What did you notice?
+2.	Using the getent command, interrogate the passwd database for labuser2 and labuser3.
+     a.	What did you notice?
+     b.	What was different about each of these accounts?
+3.	Create a new user:
+     a.	The username must be labuser4.
+     b.	Set the real name to Lab User 4.
+     c.	The users primary group must be labusers1.
+     d.	The user must be a member of the sudo group.
+     e.	Set the login shell to /bin/false.
+     f.	The user must have a home directory set to /home/labuser4
+     g.	Set the password to P@$$w0rd.
+
+NOTE: You will have to use the sudo command for these steps.
+
+4.	Using the su command, switch to the labuser4 account.
+     a.	What happened and why?
+5.	Update the labuser4 shell from /bin/false to /bin/bash.
+6.	Using the su command, switch to the labuser4 account.
+     a.	What happened and why?
+
+LOGIN MESSAGE
+7.	Using the vim editor, create an /etc/motd file. Place the following line of text in that file: "This is a private system used for the Linux System Administration CIT-220 class."
+     a.	Write and exit that file.
+
+     NOTE: You will have to use the sudo command for this step.
+
+8.	Log out of the labuser1 account.
+9.	Log in to the labuser1 account
+     a.	What did you notice?
+ 
+LEARNING ABOUT GROUPS
+10.	Create a new group:
+     a.	Name the group "finance"
+     b.	Add users labuser1, labuser2, and labuser4 to this group.
+
+11.	In the CH12 folder, create a directory called “finance”.
+     a.	Change the ownership of the finance directory with labuser4 as the owner and finance as the group.
+     b.	Change the permissions of the finance folder to 770
+
+     NOTE: You will have to use the sudo command for this step.
+
+12.	Using the su command, switch to the labuser4 account.
+     a.	Create a file called budget in the finance folder.
+     b.	What permissions does this file have?
+     c.	Who is the owner of the budget file?
+     d.	Exit from the labuser4 account.
+
+13.	Using the su command, switch to the labuser2 account.
+     a.	Create a file called accounts-payable in the finance folder.
+     b.	What permissions does this file have?
+     c.	Who is the owner of the budget file?
+     d.	Add $23,565 to the budget file using the vim editor and exit from vim.
+     e.	Why were you able to modify this file?
+     f.   Exit from the labuser2 account.
+
+14.	Using the su command, switch to the labuser3 account.
+     a.	Change to the finance folder.
+     b.	Why could you not change into the folder?
+     c.   Exit from the labuser3 account.
+
+CHANGING PASSWORDS
+15.	Change the password of labuser4 to pAsswOrd.
+
+16.	Using the su command, switch to the labuser4 account.
+     a.	Did the new password work?
+     b.	From the labuser4 account, change the password back to P@$$w0rd.
+     c.	Exit from the labuser4 account.
+
+PASSWORD AGE
+17.	List the password ages for labuser1, labuser2, labuser3 and labuser4.
+     a.	What do you notice?
+ 
+WHO ARE YOU?
+18.	Using the whoami command, discover who you are.
+19.	Using the w command, discover whom you're logged in as.
+20.	Using the su command, switch to the labuser4 account.
+     a.	Use the "w" command.
+     b.	What do you see?
+EOF
+
+     #ANSWERS
+     #3
+     # a, b, e, f
+     #useradd -m -d /home/labuser4 -c "Lab User 4" -s /bin/false labuser4
+     # c
+     #usermod -g labusers1 labuser4
+     # d
+     #usermod -a -G sudo labuser4
+     # g
+     #echo 'labuser4:P@$$w0rd' | chpasswd
+
+     #4
+     #usermod -s /bin/bash labuser4
+
+     #7
+     #printf "This is a private system used for the Linux System Administration CIT-220 class." >> /etc/motd
+
+     #10
+     # groupadd labuser4
+     #usermod -a -G finance labuser1
+     #usermod -a -G finance labuser2
+     #usermod -a -G finance labuser4
+
+     #11
+     #mkdir finance
+     #chown labuser4:finance finance
+     #chmod 02770 finance
+
+     #12
+     #touch budget
+     #chown labuser4:labusers1 budget
+
+     #touch accounts-payable
+     #chown labuser2:labusers1 accounts-payable
+     #printf "$23,565" >> budget
+
+     #15
+     #echo 'labuser4:pAsswOrd' | chpasswd
+     #echo 'labuser4:P@$$w0rd' | chpasswd
+
+     # CREATE LAB12-02 - SET PERMISSIONS
+     #Setup Quota Disk
+     wipefs /dev/sdb --all --force --quiet
+     sgdisk -g /dev/sdb >> /dev/nul
+     sgdisk -n 1:0:524254 -t 1:8300 /dev/sdb >> /dev/nul
+     mkfs.ext4 /dev/sdb1 >> /dev/null 2>&1
+
+     mkdir "$v_Working_Directory/LAB12-02"
+     printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
+     mount /labs/CH12/LAB12-02
+
+cat > "$v_LAB2" << EOF
+TODO: pg. 344 at Step 6
+EOF
+
+     chown root:labusers1 "$v_LAB2"
+     chmod 02770 "$v_LAB2"
+}
+
+#CH13 - Account Security (No Labs)
+function chapter_thirteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH13"
+     local v_LAB="$v_Working_Directory/LAB13-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     #Setup ssh
+     #pg. 364-365
+}
+
+#CH14 - Logging Services (No Labs)
+function chapter_fourteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH14"
+     local v_LAB="$v_Working_Directory/LAB14-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+#CH15 - Linux Devices (No Labs)
+function chapter_fifteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH15"
+     local v_LAB="$v_Working_Directory/LAB15-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+#CH16 - Hardware Troubleshooting - NOT DONE
+function chapter_sixteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH16"
+     local v_LAB="$v_Working_Directory/LAB16-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     #uptime
+     #cat /proc/cpuinfo
+     #iostat -c
+     #free
+     #vmstat
+     #swapon -s
+     #cat /proc/ioports
+     #lspci
+     #lsusb
+     #lsdev
+     #dmidecode
+     #lshw
+}
+
+#CH17 - Kernel Modules (No Labs)
+function chapter_seventeen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH17"
+     local v_LAB="$v_Working_Directory/LAB17-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     #TODO: Future
+     #lsmod
+}
+
+#CH18 - Storage Concepts
+function chapter_eighteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH18"
+     local v_LAB="$v_Working_Directory/LAB18-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     #1. Using the "lsblk" command, locate and identify disk /dev/sdc.
+     #2. Using the "fdisk" command, edit the partition table on /dev/sdc.
+     #   a. Create a new gpt partition (g) on /dev/sdc.
+     #   b. Create a new partition (n) on /dev/sdc.
+     #   c. List the new partition (p) on /dev/sdc.
+     #   d. Write the partition table (w) on /dev/sdc.
+     #3. Using the "lsblk" command, locate and identify disk /dev/sdc1.
+     #4. Using the "mkfs.ext4" command, create a new filesystem on the /dev/sdc1
+     #   disk.
+     #5. Using the vim editor, update the /etc/fstab.
+     #   a. Create a new folder called "LAB18-01" in the /labs/CH18 folder.
+     #6. Mount the disk:
+     #   a. Set /dev/sdc1 to mount at /labs/CH18/LAB18-01.
+     #7. Set the volume ownership and permissions:
+     #   a. Change the ownership of the "LABS18-01" folder to labuser1:labusers1.
+     #   b. Set the permissions of the "LABS18-01" folder to 02770.
+     #8. Change to the labuser2 account.
+     #   a. Create a folder called "Pets: in the LABS18-01 folder.
+     #   b. Create two files in the "Pets" folder, one called "Dogs" and another
+     #      called "Cats".
+     #   c. Exit from the labuser2 account.
+}
+
+#CH19 - Storage Configuration - NOT DONE
+function chapter_nineteen ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH19"
+     local v_LAB1="$v_Working_Directory/LAB19-01"
+     local v_LAB2="$v_Working_Directory/LAB19-02"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     #1.  Using the "lsblk" command, locate the two 128Mb disks.
+     #2.  Using the "pvcreate" command, take the first disk /dev/sdd and create
+     #    a physical volume on this disk.
+     #3.  Using the "pvdisplay" command, verify the previous command.
+     #4.  Using the "vgcreate" command, create a volume group called "vg1" on
+     #    /dev/sdd
+     #5.  Using the "vgdisplay" command, verify the previous command.
+     #6.  Using the "lvcreate" command, create a 124Mb logical volume on "vg1"
+     #    with the name "CIT220"
+     #7.  Force those changes using the "vgchange --available y" command.
+     #8.  Make an ext4 filesystem on the new logical volume at /dev/vg1/CIT220,
+     #    do not reserve blocks and apply the label CIT220 to the volume.
+
+     #    NOTE: The following warning is normal for previously written to disks,
+     #          choose "y" to continue.
+     #          "WARNING: ext4 signature detected on /dev/vg1/CIT220 at offset
+     #           1080. Wipe it? [y/n]:"
+
+     #9.  Mount the new logical volume:
+     #    a. Make a new folder called "LAB19-01" under the folder "/labs/CH19"
+     #    b. Update the filesystem table and mount the new volume at
+     #       /labs/CH19/LAB19-01.
+     #    c. Using the "mount" command, mount the filesystem.
+     #10. Using the "pvcreate" command, take the second disk /dev/sde and create
+     #    a physical volume on this disk.
+     #11. Using the "vgdisplay" command, list the volume group vg1.
+     #    a. Note the "VG size".
+     #12. Using the "vgextend" command, extend the volume group "vg1" onto the
+     #    /dev/sde physical volume.
+     #13. Using the "pvdisplay" command, list the physical volumes.
+     #14. Using the "lvextend" command, extend the "/dev/vg1/CIT220" volume by
+     #    +124Mb
+     #15. Using the "vgdisplay" command, list the volume group vg1.
+     #    a. Did the "VG size" change?
+     #16. Using the "lsblk" command, locate the two 128Mb disks.
+     #    a. Ensure the extents have been expanded.
+     #17.Set the volume ownership and permissions:
+     #   a. Change the ownership of the "LABS18-01" folder to labuser1:labusers1.
+     #   b. Set the permissions of the "LABS18-01" folder to 02770.
+
+     #TFU Fix:
+     #umount /dev/mapper/vg1-CIT220
+     #sed remove /etc/fstab
+     #vgchange -a n vg1
+     #lvremove /dev/vg1/CIT220
+     #vgremove vg1
+     #pvremove /dev/sdd
+     #wipefs /dev/sdd --all --force --quiet
+     #sgdisk --zap /dev/sdd >> /dev/nul
+     #pvremove /dev/sde
+     #wipefs /dev/sde --all --force --quiet
+     #sgdisk --zap /dev/sde >> /dev/
+     #rm -r /labs/CH19/LABS10-01
+
+     #resize2fs /dev/vg1/CIT220
+
+     #2
+     #pvcreate /dev/sdd
+     #4
+     #vgcreate vg1 /dev/sdd
+     #6
+     #lvcreate -L 124M -n CIT220 vg1
+     #8
+     #mkfs.ext4 -F -m 0 -L "CIT220" /dev/vg1/CIT220
+     #9
+     #printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01 ext4 defaults  0    0\n" >> /etc/fstab
+     #10
+     #pvcreate /dev/sde
+     #12
+     #vgextend vg1 /dev/sde
+     #14
+     #lvextend -L +124M /dev/vg1/CIT220
+
+     #RAID
+}
+
+#CH20 - Network Configuration (No Labs)
+function chapter_twenty ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH20"
+     local v_LAB="$v_Working_Directory/LAB20-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+#CH21 - Network Troubleshooting - NOT DONE
+function chapter_twenty-one ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH21"
+     local v_LAB="$v_Working_Directory/LAB21-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #Troubleshooting Tools
+}
+
+#CH22 - Linux Firewalls
+function chapter_twenty-two ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH22"
+     local v_LAB="$v_Working_Directory/LAB22-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #1.  Open a terminal window and send a continous ping to your linux server.
+     #2.  From the linux server add an iptables rule to drop all icmp packets.
+     #    a. What happened to the ping running in the other window?
+     #3.  Remove this rule from iptables.
+
+     #2
+     #iptables -A INPUT -p icmp -j DROP
+     #3
+     #iptables -D INPUT -p icmp -j DROP
+}
+
+#CH23 - Orchestration (No Labs)
+function chapter_twenty-three ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH23"
+     local v_LAB="$v_Working_Directory/LAB23-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+}
+
+#CH24 - Orchestration
+function chapter_twenty-four ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH24"
+     local v_LAB="$v_Working_Directory/LAB24-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02775 "$v_Working_Directory"
+
+     # Create a script to display a message.
+     printf '#!/bin/sh' >> "$v_Working_Directory/lab2401.sh"
+     printf "wall \"It's time to stop working on these labs.\"\n" >> "$v_Working_Directory/lab2401.sh"
+     chown labuser1:labusers "$v_Working_Directory/lab2401.sh"
+     chmod 770 "$v_Working_Directory/lab2401.sh"
+
+     #1. Using the "at" command, run the "lab2401.sh" script in five minutes.
+     #   NOTE: You will have to pass the at command the string (shown below),
+     #         dont forget to exit at with the [CTRL]+[D] keys.
+     #         /bin/sh /labs/CH24/lab2401.sh
+     #
+     #   a. View the job in the queue using the "atq" command.
+     #   b. Did it run?
+     #   c. What printed on the screen in five minures?
+
+     #1
+     #   at now + 5 minute
+     #at>/bin/sh /labs/CH24/lab2401.sh
+     #at>[CTRL]+[D]
+}
+
+#CH25 - Localization
+function chapter_twenty-five ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH25"
+     local v_LAB="$v_Working_Directory/LAB25-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #1.  Display the system time.
+     #2.  Display the hardware clock.
+     #3.  Display the current timezone set.
+     #    a. What is it set to?
+     #4.  Change the timezone to /usr/share/zoneinfo/America/New_York by
+     #    updating the symbolic link to this file.
+     #5.  View the time settings using the "datetimectl" command.
+     #    a. is NTP active?
+     #6.  Using the "local -a" command, list the cirrently installed locale's
+     #    a. What locale's are installed?
+     #7.  Using the "localectl" command view the current keyboard layout.
+     #    a. What do you notice about the keyboard type?
+
+     #1
+     #date
+     #2
+     #hwclock
+     #3
+     #ls -l /etc/localtime
+     #4
+     #ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+     #ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime #(reset)
+     #5
+     #datetimectl
+     #6
+     #locale -a
+     #7
+     #localectl status
+
+}
+
+#CH26 - Bash Scripting Essentials
+function chapter_twenty-six ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH26"
+     local v_LAB="$v_Working_Directory/LAB26-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #1.  Write a bash script that will count from 1 to 10 in increments of one,
+     #    two and five.
+     #2.  Write a bash script that will prompt you for your weight and calculate
+     #    your weight on the moon.  You must use a constant for the moon weight.
+
+     #1
+     #    #!/bin/bash
+     #    for i in {1..10}; do      echo $i; done
+     #    for i in {1..10..2}; do      echo $i; done
+     #    for i in {1..10..5}; do      echo $i; done
+     #2
+     #    #!/bin/bash
+     #    moon_pct_diff=.165
+     #    read -p "Enter your weight on the earth's surface: " weight
+     #    pct_weight=$(echo "$weight*$moon_pct_diff" | bc)
+     #    moon_weight=$(printf %.2f $(echo "scale=2;($weight-$pct_weight)" | bc))
+     #    echo "Your weight on the moon is:" $moon_weight
+}
+
+#CH27 - Git
+function chapter_twenty-seven()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH27"
+     local v_LAB="$v_Working_Directory/LAB27-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #1.  Look in the "/labs/CH26" folder.
+     #    a. What do you see?
+     #2.  The "lsRules" is a clone of a script from my public repository on
+     #    GitHub.
+     #3.  Make a new folder in the "CH26" follder, call it "lab26-01".
+     #4.  Change to the "lab26-01" folder.
+     #5.  Create a personal account on GitHub (unless you already have one).
+     #6.  Set your global identity using the following two commands:
+     #    a. git config --global user.email "email@acd.ccac.edu"
+     #    b. git config --global user.name "Your Name"
+     #
+     #    NOTE: The email address and name values must match your GitHub
+     #          account name and email address.
+     #
+     #7.  Set the main branch default as follows:
+     #    a. git config --global init.defaultBranch main
+     #8.  Generate an ssh key using the following command:
+     #    a. ssh-keygen -t ed25519 -C "email@acd.ccac.edu"
+     #    b. Start the ssh-agent and add the key you just generated.
+     #    c. Add that ssh key to your GitHub account.
+     #
+     #    NOTE: Review the references below before coming to me with questions.
+     #
+     #9.  On GitHub, create a new repository called "lab26-01" and copy the
+     #    SSH of that repository.
+     #10. Create a README.md file and place the following information in the
+     #    first four lines (minus the letters a-d of course):
+     #    a. # LAB26-01
+     #    b. **LAB26-01** - A lab that shows me how to use Git.
+     #    c. FirstName LastName <email@acd.ccac.edu>
+     #    d. Copyright &copy; FirstName LastName 2023.
+     #11. Initilize the git repository.
+     #    a. What happened?
+     #12. Add the README.md file to the repository.
+     #13. Commit your changes.
+     #    a. What happened?
+     #14. Add your GitHub repository.
+     #    a. git remi=ote add origin <HTTPS URL FROM GITHUB>
+     #15. Push your changes.
+     #16. Make several updates, add files, change the contents of the README
+     #    file, then follow steps 12-15 to update your repository, and look
+     #    for those changes on GitHub.
+
+
+     #REFERENCES
+     #https://www.geeksforgeeks.org/how-to-push-folders-from-local-pc-to-github-using-git-commands/
+     #https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux
+     #https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+
+     #3
+     #mkdir /labs/CH26/lab26-01
+
+     #4
+     #cd /labs/CH26/lab26-01
+
+     #6
+     #git config --global user.email "matthew.kisow@icloud.com"
+     #git config --global user.name "DoctorKisow"
+
+     #7
+     #git config --global init.defaultBranch main
+
+     #8
+     #ssh-keygen -t ed25519 -C "matthew.kisow@icloud.com"
+     #eval "$(ssh-agent -s)"
+     #ssh-add ~/.ssh/id_ed25519
+     #cat ~/.ssh/id_ed25519.pub
+
+     #10
+     #printf "#LAB26-02\n" >> README
+     #printf "**LAB26-02** - A lab that shows me how to use Git.\n" >> README
+     #printf "Dr. Matthew Kisow <mkisow@ccac.edu>\n" >> README
+     #printf "Copyright &copy; D. Matthew Kisow 2022-2023.\n" >> README
+
+     #11
+     #git init
+
+     #12
+     #git add README.md
+
+     #13
+     #git commit -m "first comit"
+
+     #14
+     #git remote add origin https://github.com/DoctorKisow/lab27-02.git
+
+     #15
+     #git push -u origin main
+}
+
+#CH28 - Server Roles (No Labs)
+function chapter_twenty-eight ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH28"
+     local v_LAB="$v_Working_Directory/LAB28-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+}
+
+#CH29 - Security Best Practice (No Labs)
+function chapter_twenty-nine ()
+{
+     local v_Working_Directory="$g_LAB_PATH/CH29"
+     local v_LAB="$v_Working_Directory/LAB29-01"
+
+     # CREATE DIRECTORIES
+     mkdir "$v_Working_Directory"
+
+     # SET SECURITY
+     chmod 02770 "$v_Working_Directory"
+
+     #TODO: Chroot an Apache server
+}
+
+# *************** begin of script proper ***************
+script_banner
+process_command_line_options "${@}"
+internal_consistency_option_checks
+
+if ((g_ARG_CHANGE_LAB==1)); then
+     info "Change a lab to completed."
+
+     #if [ $EUID -ne 1000 ]; then
+     if [ $EUID -ne 0 ]; then
+          warning "This option can only be run by your instructor."
+          cleanup_and_exit_with_code 1
+     fi
+fi
+
+if ((g_ARG_GRADE_LAB==1)); then
+     info "Grade a completed lab."
+fi
+
+if ((g_ARG_INSTALL==1)); then
+     info "Install the lab enviornment using this script."
+fi
+
+if ((g_ARG_UPDATE==1)); then
+     info "Update the current script to a new version."
+     update
+fi
+
+cleanup_and_exit_with_code 0
+
+# Main Script Start
+#base
+#chapter_one
+#chapter_two
+#chapter_three
+#chapter_four
+#chapter_five
+#chapter_six
+#chapter_seven
+#chapter_eight
+#chapter_nine
+#chapter_ten
+#chapter_eleven
+#chapter_twelve
+#chapter_thirteen
+#chapter_fourteen
+#chapter_fifteen
+#chapter_sixteen
+#chapter_seventeen
+#chapter_eighteen
+#chapter_nineteen
+#chapter_twenty
+#chapter_twenty-one
+#chapter_twenty-two
+#chapter_twenty-three
+#chapter_twenty-four
+#chapter_twenty-five
+#chapter_twenty-six
+#chapter_twenty-seven
+#chapter_twenty-eight
+#chapter_twenty-nine
+# **************** end of script proper ****************
+
+
+# NOTES
+################################################################################
+# Remove user from group
+# deluser <username> <groupname>
+#
+# Add user to group, -g (primary group), -G (additional group)
+# usermod -a [-G|-g] <group name> <username>
+#
+#  UID GID OID OWNER GROUP OTHER
+#    4   2   1   rwx   rwx   rwx
+# READ WRITE EXECUTE
+#    4     2       1
+################################################################################
