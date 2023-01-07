@@ -49,7 +49,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.2"
+g_VERSION="0.0.3"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -326,10 +326,8 @@ function update ()
      # Compare the script versions and update if newer.
      if version $v_VERSION $g_VERSION; then
           info "Updating the $g_PROGRAM_NAME script."
-          #printf "Updating ${g_PROGNAME} \e[31;1m%s\e[0m -> \e[32;1m%s\e[0m\n" "$g_VERSION" "$v_VERSION"
 
           # Get a new version of the script.
-          #wget -q -O ${g_PROGNAME}.new https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
           l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
           curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
 
@@ -362,9 +360,10 @@ function update_notice ()
      if version $v_VERSION $g_VERSION; then
           info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
      else
-          info "You are at the current version of this script."
-          if [ -f ${g_SCRIPT_PATH}/update.sh ]; then
-               rm ${g_SCRIPT_PATH}/update.sh
+          info "You are at the current version of this script.\n\n"
+
+          if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
+               rm "${g_SCRIPT_PATH}/updater.sh"
           fi
      fi
 }
