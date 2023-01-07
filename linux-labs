@@ -109,7 +109,7 @@ function script_banner ()
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
 
-     if [[ "$g_ARG_UPDATE" == 1 ]]; then
+     if [[ "$g_ARG_UPDATE" != 1 ]]; then
           update_notice
      fi
 }
