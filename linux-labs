@@ -302,34 +302,26 @@ function internal_consistency_option_checks ()
      done
 }
 
-# (version) - Function used to compare version numbers of two version numbers passed to it.
-function version ()
-{
-     test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1";
-}
-
 # (update) - Function used to check for and update this script from the repository.
 function update ()
 {
      local l_TMP_FILE
      local l_ABS_PATH
+     local l_VERSION
 
      info "Checking for updates to the installation script."
 
      cd ${g_SCRIPT_PATH}
 
-     # Get the version form the repository and source the file.
-     wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/.version
-     source "${g_SCRIPT_PATH}/.version"
-     rm "${g_SCRIPT_PATH}/.version"
+     # Get a new version of the script.
+     l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
+     curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
+
+     l_VERSION=$(grep "^g_VERSION" "$TMP_FILE" | awk -F'[="]' '{print $3}')
 
      # Compare the script versions and update if newer.
-     if version $v_VERSION $g_VERSION; then
+     if [ "$g_VERSION" \< "$l_VERSION" ]; then
           info "Updating the $g_PROGRAM_NAME script."
-
-          # Get a new version of the script.
-          l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
-          curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
 
           # Create updater script.
           l_ABS_PATH=$(readlink -f "$g_SCRIPT_LOCATION")
@@ -341,6 +333,8 @@ function update ()
           chmod 770 "$l_TMP_FILE"
           chown root:labusers1 "$l_TMP_FILE"
           exec /bin/bash $g_SCRIPT_PATH/updater.sh
+     else
+          rm "$l_TMP_FILE"
      fi
 
      cleanup_and_exit_with_code 0
@@ -351,16 +345,19 @@ function update_notice ()
 {
      cd ${g_SCRIPT_PATH}
 
-     # Get the version form the repository and source the file.
-     wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/.version
-     source "${g_SCRIPT_PATH}/.version"
-     rm "${g_SCRIPT_PATH}/.version"
+     # Get a new version of the script.
+     l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
+     curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
 
-     # Compare the script versions and update if newer.
-     if version $v_VERSION $g_VERSION; then
+     l_VERSION=$(grep "^g_VERSION" "$TMP_FILE" | awk -F'[="]' '{print $3}')
+
+     # Compare the script versions and notify if newer.
+     if [ "$g_VERSION" \< "$l_VERSION" ]; then
           info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
      else
           info "You are at the current version of this script.\n\n"
+
+          rm "$l_TMP_FILE"
 
           if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
                rm "${g_SCRIPT_PATH}/updater.sh"
