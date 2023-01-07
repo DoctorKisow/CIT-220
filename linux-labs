@@ -49,7 +49,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.3"
+g_VERSION="0.0.4"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -109,7 +109,7 @@ function script_banner ()
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
 
-     if ! ((g_ARG_UPDATE)); then
+     if [[ "$g_ARG_UPDATE" == 1 ]]; then
           update_notice
      fi
 }
