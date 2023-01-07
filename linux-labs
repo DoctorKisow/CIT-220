@@ -52,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.1"
+g_VERSION="0.0.2"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023"
@@ -85,16 +85,19 @@ g_SHOWPREFIX="${g_GREEN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}"
 g_SCRIPT_PATH="`dirname \"$0\"`"
 g_SCRIPT_PATH="`( cd \"$g_SCRIPT_PATH\" && pwd )`"
 
-# (g_ARG_<variable>) - Boolean values used to indicate which command line options are sed during execution; the default for all values is 0.
-
+# (g_ARG_<variable>) - Boolean values used to indicate which command line options are set during execution; the default for all values is 0.
 # WARNING: DO NOT MODIFY THESE VALUE(S)!
 declare -i g_ARG_CHANGE_LAB=0
 declare -i g_ARG_GRADE_LAB=0
 declare -i g_ARG_INSTALL=0
+declare -i g_ARG_ROLLBACK_LAB=0
 declare -i g_ARG_UPDATE=0
 
 declare -i g_ARG_CHANGE=0
 declare -i g_ARG_GRADE=0
+declare -i g_ARG_ROLLBACK=0
+
+declare g_FIRST_TOKEN=""
 
 # ********************************** functions *********************************
 # (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
@@ -159,14 +162,16 @@ trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
 function print_usage ()
 {
      cat << EOF
-  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-u|--update] [-v]
+  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
+                       [-u|--update] [-v]
   Options:
-    -c,                     roll the enviornment forward to a lab [1-29]
-    -g,                     grade a completed lab [1-29]
-    -h,                     show this help message
-    -i, --install           install the lab enviornment
-    -u, --update            update the ${g_PROGNAME} script
-    -v,                     display the version number of ${g_PROGNAME} and exit
+    -c                     roll the enviornment forward to a lab [1-29]
+    -g                     grade a completed lab [1-29]
+    -h                     show this help message
+    -i --install           install the lab enviornment
+    -r                     roll back a specific lab [1-29]
+    -u --update            update the ${g_PROGNAME} script
+    -v                     display the version number of ${g_PROGNAME} and exit
 EOF
 }
 
@@ -205,12 +210,17 @@ function process_command_line_options ()
 
      # Error trapping is turned off because we want to handle errors.
      set +e
-          l_TEMP="$(getopt -o c:g:hiuv --long install,update -n "${g_PROGNAME}" -- "${@}")"
+          l_TEMP="$(getopt -o c:g:hir:uv --long install,update -n "${g_PROGNAME}" -- "${@}")"
           l_RC="${?}"
      set -e
 
      # Check if any invalid options were passed and display help.
      if ((l_RC!=0)); then
+          display_usage_message_and_bail_out
+     fi
+
+     # No arguements were passed to the script, display help.
+     if [ $# -eq 0 ]; then
           display_usage_message_and_bail_out
      fi
 
@@ -225,6 +235,9 @@ function process_command_line_options ()
           esac
      done
 
+     # Set the first token for the error message when multiple tol=kens are passed.
+     g_FIRST_TOKEN=${1}
+
      # Extract the options and their arguments into variables.
      while true ; do
           case "${1}" in
@@ -232,6 +245,7 @@ function process_command_line_options ()
                -g) g_ARG_GRADE_LAB=1; g_ARG_GRADE=${2}; (( g_ARG_GRADE >= 1 && g_ARG_GRADE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
                -h) display_usage_message_and_bail_out ;;
                -i) g_ARG_INSTALL=1; shift ;;
+               -r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
                -u) g_ARG_UPDATE=1; shift ;;
                -v) print_version >&2; cleanup_and_exit_with_code 1 ;;
                --) shift; break ;;
@@ -242,33 +256,45 @@ function process_command_line_options ()
 # (internal_consistency_option_checks) - Function used to validate the some of the more obvious configuration file snafus.
 function internal_consistency_option_checks ()
 {
-     if ((g_ARG_CHANGE_LAB==1)); then
-          if ((g_ARG_GRADE_LAB==1  ||  g_ARG_INSTALL==1  ||  g_ARG_UPDATE==1)); then
-               warning "You cannot change the enviornment with any other options set."
-               cleanup_and_exit_with_code 1
-          fi
-     fi
-
-     if ((g_ARG_UPDATE==1)); then
-          if ((g_ARG_CHANGE_LAB || g_ARG_GRADE_LAB==1  ||  g_ARG_INSTALL==1)); then
-               warning "You cannot update this script with any other options set."
-               cleanup_and_exit_with_code 1
-          fi
-     fi
-
-     if ((g_ARG_INSTALL==1)); then
-          if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_GRADE_LAB==1)); then
-               warning "You cannot setup the labs enviornment with any other options set."
-               cleanup_and_exit_with_code 1
-          fi
-     fi
-
-     if ((g_ARG_GRADE_LAB==1)); then
-          if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
-               warning "You cannot grade a lab with any other options set."
-               cleanup_and_exit_with_code 1
-          fi
-     fi
+     while true ; do
+          case "$g_FIRST_TOKEN" in
+               -c)
+                    if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL  ||  g_ARG_UPDATE)); then
+                         warning "You cannot change the enviornment with any other options set."
+                         cleanup_and_exit_with_code 1
+                    fi
+                    break
+                    ;;
+               -g)
+                    if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
+                         warning "You cannot grade a lab with any other options set."
+                         cleanup_and_exit_with_code 1
+                    fi
+                    break
+                    ;;
+               -i)
+                    if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+                         warning "You cannot setup the labs enviornment with any other options set."
+                         cleanup_and_exit_with_code 1
+                    fi
+                    break
+                    ;;
+               -r)
+                    if ((g_ARG_GRADE_LAB ||g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
+                         warning "You cannot rollback a lab with any other options set."
+                         cleanup_and_exit_with_code 1
+                    fi
+                    break
+                    ;;
+               -u)
+                    if ((g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL)); then
+                         warning "You cannot update this script with any other options set."
+                         cleanup_and_exit_with_code 1
+                    fi
+                    break
+                    ;;
+          esac
+     done
 }
 
 # (version) - Function used to compare version numbers of two version numbers passed to it.
@@ -294,6 +320,24 @@ function update ()
 
           # Get a new version of the script.
           wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs
+     fi
+
+     cleanup_and_exit_with_code 0
+}
+
+# (update_notice) - Function used to notify the user of a new script available in the repository.
+function update_notice ()
+{
+     cd ${g_SCRIPT_PATH}
+
+     # Get the version form the repository and source the file.
+     wget -c -q https://github.com/DoctorKisow/CIT-220/raw/main/.version
+     source "${g_SCRIPT_PATH}/.version"
+     rm "${g_SCRIPT_PATH}/.version"
+
+     # Compare the script versions and update if newer.
+     if version $v_VERSION $g_VERSION; then
+          info "There is a new version v$v_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt."
      fi
 
      cleanup_and_exit_with_code 0
@@ -2574,8 +2618,9 @@ function chapter_twenty-nine ()
      #TODO: Chroot an Apache server
 }
 
-# *************** begin of script proper ***************
+# *************************** begin of script proper ***************************
 script_banner
+#update_notice
 process_command_line_options "${@}"
 internal_consistency_option_checks
 
@@ -2595,6 +2640,10 @@ fi
 
 if ((g_ARG_INSTALL==1)); then
      info "Install the lab enviornment using this script."
+fi
+
+if ((g_ARG_ROLLBACK_LAB==1)); then
+     info "Rollback the lab to the beginning."
 fi
 
 if ((g_ARG_UPDATE==1)); then
@@ -2635,7 +2684,7 @@ cleanup_and_exit_with_code 0
 #chapter_twenty-seven
 #chapter_twenty-eight
 #chapter_twenty-nine
-# **************** end of script proper ****************
+# **************************** end of script proper ****************************
 
 
 # NOTES
