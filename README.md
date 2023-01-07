@@ -14,9 +14,9 @@ Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
           cd ~
           git clone https://github.com/DoctorKisow/CIT-220.git
 ```
-3. Using the _chmod +x_ command, make the **linux-lab0** script executable.
+3. Using the _chmod +x_ command, make the **linux-lab** script executable.
 ```shell
-          chmod +x linux-lab
+          chmod 770 linux-lab
 ```
 4. using the _linux-lab_ command, check for script updates from the **linux-lab** using the -u switch.
 ```shell
