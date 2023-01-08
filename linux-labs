@@ -108,10 +108,6 @@ function script_banner ()
      printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
-
-     if [[ "$g_ARG_UPDATE" != 1 ]]; then
-          update_notice
-     fi
 }
 
 # (info) - Function for formatted informational messages.
@@ -166,7 +162,8 @@ trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
 # (print_usage) - Function used to display the scripts usage and command line options.
 function print_usage ()
 {
-     cat << EOF
+  cat << EOF
+
   Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
                     [-u|--update] [-v]
   Options:
@@ -2648,6 +2645,10 @@ function chapter_twenty-nine ()
 script_banner
 process_command_line_options "${@}"
 internal_consistency_option_checks
+
+if ((g_ARG_UPDATE==0)); then
+     update_notice
+fi
 
 if ((g_ARG_CHANGE_LAB==1)); then
      info "Change a lab to completed."
