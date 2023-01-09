@@ -5,7 +5,6 @@ Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
 
 ## Tasks
 - [ ] LAB01-01 - Student Install
-- [ ] LAB12-02 - Disk Quotas
 - [ ] LAB13-01 - (ssh)
 - [ ] LAB17-01 - (lsmod)
 - [ ] LAB29-01 - Chroot on Apache Server
