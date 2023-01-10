@@ -7,6 +7,7 @@ Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
 - [ ] LAB01-01 - Student Install
 - [ ] LAB13-01 - (ssh)
 - [ ] LAB17-01 - (lsmod)
+- [ ] LAB23-01 - Network Troubleshooting
 - [ ] LAB29-01 - Chroot on Apache Server
 
 ## Installation
