@@ -4332,8 +4332,12 @@ if ((g_ARG_GRADE_LAB==1)); then
 fi
 
 if ((g_ARG_INSTALL==1)); then
-     info "Starting installation of the lab enviornment."
-
+     if ! ((g_ARG_FINISH_INSTALL==1)); then
+          info "Starting installation of the lab enviornment."
+     else
+          info "Finishing the installation of the lab enviornment."
+     fi
+     
      # Is this linux a supported device? If not, error and quit.
      if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
           error "You are attempting to run this script on a device that is not supported."
