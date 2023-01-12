@@ -638,15 +638,14 @@ function base ()
 
           if [ "$g_SCRIPT_PATH" == "/" ]; then
                printf "mv \"/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-               printf "rm \"/$g_PROGNAME\"\n" >> install.sh
+               printf "rm \"/install.sh\"\n" >> install.sh
           else
                printf "mv \"$g_SCRIPT_PATH/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-               printf "rm \"$g_SCRIPT_PATH/$g_PROGNAME\"\n" >> install.sh
+               printf "rm \"$g_SCRIPT_PATH/install.sh\"\n" >> install.sh
           fi
 
           chmod 750 "$g_SCRIPT_PATH/install.sh"
           chown mkisowa:labuser1 "$g_SCRIPT_PATH/install.sh"
-          info "running"
           exec /bin/bash "$g_SCRIPT_PATH/install.sh"
      fi
 }
