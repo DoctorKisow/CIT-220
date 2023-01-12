@@ -12,22 +12,27 @@ Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
 
 ## Installation
 1. Following the instructions for your distribution, install git.
-2. Using the _git clone_ command, clone **CIT-220** from this repository into your home directory.
+2. Using the _mkdir_ command, create a directory called */Lab Files* at the root of the drive.
 ```shell
-          cd ~
-          git clone https://github.com/DoctorKisow/CIT-220.git
+          cd /
+          mkdir "/Lab Files"
 ```
-3. Using the _chmod +x_ command, make the **linux-lab** script executable.
+3. Using the _curl_ command, download the **linux-lab** script executable.
 ```shell
-          chmod 770 linux-lab
+         curl -s -L "https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs" >> linux-labs
 ```
-4. using the _linux-lab_ command, check for script updates from the **linux-lab** using the -u switch.
+4. Using the _chmod_ command, change the permissions of the **linux-labs** script to _750_.
 ```shell
-          bash linux-lab -u
+          chmod 750 linux-lab
+
 ```
-5. Using the _bash_ command, install **linux-lab** using the -i switch.
+5. Using the _linux-lab_ command, install the labs by issuing the **linux-lab** command using the _-i_ switch.
 ```shell
           bash linux-lab -i
+```
+6. Using the _chown_ command, change the ownership of the **linux-labs** script to _root:labusers1_.
+```shell
+          chown root:labusers1 linux-lab
 ```
 
 
