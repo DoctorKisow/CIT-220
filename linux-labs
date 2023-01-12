@@ -21,6 +21,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# CHECk FOR DEBIAN
+
 # ##############################################################################
 # Virtual Machine Setup
 #
@@ -511,36 +513,36 @@ function base ()
 
      info "  Installing the required system packages."
      #CH06 (ifconfig)
-     info "   Installing the net-tools package(s)."
+     info "    Installing the net-tools package(s)."
      apt -y install net-tools -qq &>/dev/null
      #CH07
-     info "   Installing the tree package(s)."
+     info "    Installing the tree package(s)."
      apt -y install tree -qq &>/dev/null
      #CH09
-     info "   Installing the acl package(s)."
+     info "    Installing the acl package(s)."
      apt -y install acl -qq &>/dev/null
      #CH11
-     info "   Installing the zip package(s)."
+     info "    Installing the zip package(s)."
      apt -y install zip -qq &>/dev/null
      #CH12
-     info "   Installing the quota package(s)."
+     info "    Installing the quota package(s)."
      apt -y install quota -qq &>/dev/null
      #CH16
-     info "   Installing the sysstat package(s)."
+     info "    Installing the sysstat package(s)."
      apt -y install sysstat -qq &>/dev/null
-     info "   Installing the procinfo package(s)."
+     info "    Installing the procinfo package(s)."
      apt -y install procinfo -qq &>/dev/null
      #CH20
-     info "   Installing the network-manager package(s)."
+     info "    Installing the network-manager package(s)."
      apt -y install network-manager -qq &>/dev/null
      #CH21
-     info "   Installing the whois package(s)."
+     info "    Installing the whois package(s)."
      apt -y install whois -qq &>/dev/null
      #CH23
-     info "   Installing the at package(s)."
+     info "    Installing the at package(s)."
      apt -y install at -qq &>/dev/null
      #CH27
-     info "   Installing the git package(s)."
+     info "    Installing the git package(s)."
      apt -y install git -qq &>/dev/null
 
      # ADD GROUPS
@@ -585,7 +587,7 @@ function base ()
           useradd -c "Lab User 3" -m -s /bin/bash labuser3
           usermod -u 1003 labuser3
           usermod -g labusers1 labuser3
-          usermod -a -G labusers2 labuser3
+          usermod -a -G labusers3 labuser3
           echo "labuser3:${l_LABUSER_PASS}" | chpasswd
      else
           warning "A previous lab enviornment may not have been cleaned up corretly."
@@ -609,8 +611,8 @@ function base ()
 
      # DISABLE SSH (CH05 LAB)
      info "  Disabling the ssh service."
-     systemctl disable ssh.service
-     systemctl stop
+     systemctl disable ssh.service &>/dev/null
+     systemctl stop ssh.service &>/dev/null
 
      # Set a sourceable file that lists the install date.
      l_TIMESTAMP=$(echo $(date +%d-%b-%Y) | tr '[:lower:]' '[:upper:]')
@@ -4327,6 +4329,11 @@ fi
 
 if ((g_ARG_INSTALL==1)); then
      info "Starting installation of the lab enviornment."
+
+     # Is this linux a supported device?
+     if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
+          error "You are attempting to run this script on a device that is not supported."
+     fi
 
      if [[ -f "$g_LAB_PATH/.lid" ]]; then
           source "$g_LAB_PATH/.lid"
