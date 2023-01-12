@@ -38,6 +38,7 @@
 # !!!!!!!!!!!!
 # ! ssh still disabled in base
 # ! need to change lab paths
+# ! update version
 
 
 # Scroll to the bottom of this script to follow the main script flow.
@@ -517,25 +518,36 @@ function base ()
 
      info "  Installing the required system packages."
      #CH06 (ifconfig)
+     info "   Installing the net-tools package(s)."
      apt -y install net-tools -qq &>/dev/null
      #CH07
+     info "   Installing the tree package(s)."
      apt -y install tree -qq &>/dev/null
      #CH09
+     info "   Installing the acl package(s)."
      apt -y install acl -qq &>/dev/null
      #CH11
+     info "   Installing the zip package(s)."
      apt -y install zip -qq &>/dev/null
      #CH12
+     info "   Installing the quota package(s)."
      apt -y install quota -qq &>/dev/null
      #CH16
+     info "   Installing the sysstat package(s)."
      apt -y install sysstat -qq &>/dev/null
+     info "   Installing the procinfo package(s)."
      apt -y install procinfo -qq &>/dev/null
      #CH20
+     info "   Installing the network-manager package(s)."
      apt -y install network-manager -qq &>/dev/null
      #CH21
+     info "   Installing the whois package(s)."
      apt -y install whois -qq &>/dev/null
      #CH23
+     info "   Installing the at package(s)."
      apt -y install at -qq &>/dev/null
      #CH27
+     info "   Installing the git package(s)."
      apt -y install git -qq &>/dev/null
 
      # ADD GROUPS
@@ -4357,6 +4369,7 @@ if ((g_ARG_INSTALL==1)); then
           #          test_user labuser2
           #          test_user labuser3
           #          test_user labuser4
+          #          test_user labuser5
           #
           #          info "  Removing security groups."
           #          test_group labusers1
@@ -4380,25 +4393,36 @@ if ((g_ARG_INSTALL==1)); then
           #
           #          info "Removing installed packages."
           #          #CH06 (ifconfig)
+          #          info "   Removing the net-tools package(s)."
           #          apt -y remove net-tools -qq &>/dev/null
           #          #CH07
+          #          info "   Removing the tree package(s)."
           #          apt -y remove tree -qq &>/dev/null
           #          #CH09
+          #          info "   Removing the acl package(s)."
           #          apt -y remove acl -qq &>/dev/null
           #          #CH11
+          #          info "   Removing the zip package(s)."
           #          apt -y remove zip -qq &>/dev/null
           #          #CH12
+          #          info "   Removing the quota package(s)."
           #          apt -y remove quota -qq &>/dev/null
           #          #CH16
+          #          info "   Removing the sysstat package(s)."
           #          apt -y remove sysstat -qq &>/dev/null
+          #          info "   Removing the procinfo package(s)."
           #          apt -y remove procinfo -qq &>/dev/null
           #          #CH20
+          #          info "   Removing the network-managerpackage(s)."
           #          apt -y remove network-manager -qq &>/dev/null
           #          #CH21
+          #          info "   Removing the whois package(s)."
           #          apt -y remove whois -qq &>/dev/null
           #          #CH23
+          #          info "   Removing the at package(s)."
           #          apt -y remove at -qq &>/dev/null
           #          #CH27
+          #          info "   Removing the git package(s)."
           #          apt -y remove git -qq &>/dev/null
           #     fi
 
