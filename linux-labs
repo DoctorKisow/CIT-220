@@ -634,7 +634,7 @@ function base ()
 
      # Create script to move installation script to labs directory
      if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
-          info "Moving this script into the \"$g_LAB_PATH\" folder, please restart the\n        script from that location."
+          info "Moving this script into the \"$g_LAB_PATH\" folder, please restart the\n         script from that location."
           printf '#!/bin/bash\n\n' >> install.sh
 
           if [ "$g_SCRIPT_PATH" == "/" ]; then
@@ -4344,6 +4344,8 @@ if ((g_ARG_GRADE_LAB==1)); then
 fi
 
 if ((g_ARG_INSTALL==1)); then
+     local l_REPLY
+     
      info "Starting installation of the lab enviornment."
 
      # Is this linux a supported device?
@@ -4364,7 +4366,8 @@ if ((g_ARG_INSTALL==1)); then
           if [ -n "$g_INSTALL_DATE" ]; then
                printf "The install date of this lab was on: $g_INSTALL_DATE\n"
 
-               if test_yn "Are you sure you want to reinstall the lab enviornment"; then
+               read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
+               if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
                     info "Completely removing the lab enviornment."
                     info "  Removing the directory and symlink."
                     if [[ -d "$g_LAB_PATH" ]]; then
