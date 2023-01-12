@@ -2867,7 +2867,7 @@ EOF
                mkdir "$l_WORKING_DIRECTORY/$l_LAB-Q"
                cp /etc/fstab{,.bak}
                printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02-Q	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
-               mount /labs/CH12/LAB12-02
+               mount /labs/CH12/LAB12-02-Q
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB12-02
@@ -4334,21 +4334,23 @@ fi
 if ((g_ARG_INSTALL==1)); then
      info "Starting installation of the lab enviornment."
 
-     # Is this linux a supported device?
+     # Is this linux a supported device? If not, error and quit.
      if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
           error "You are attempting to run this script on a device that is not supported."
      fi
 
+     # Does the lab install date file exist, if yes source it.
      if [[ -f "$g_LAB_PATH/.lid" ]]; then
           source "$g_LAB_PATH/.lid"
      fi
 
+     # Are we being run by an instructor, if yes run it.
      #if [ $EUID -ne 1000 ]; then
      if [ $EUID -ne 0 ]; then
           warning "This option can only be run by your instructor."
           cleanup_and_exit_with_code 1
      fi
-
+echo "gafi: " $g_ARG_FINISH_INSTALL
      if ! ((g_ARG_FINISH_INSTALL==1)); then
           if [ -n "$g_INSTALL_DATE" ]; then
                printf "The install date of this lab was on: $g_INSTALL_DATE\n"
