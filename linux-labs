@@ -559,6 +559,10 @@ function base ()
           warning "A previous lab enviornment may not have been cleaned up corretly."
      fi
 
+     # Ignore error when adding users, due to manually setting UID/GID.
+     set +e
+     set +u
+
      # ADD USERS
      if ! [ "`id -u labuser1 2>/dev/null`" ]; then
           info "  Creating the labuser1 account."
@@ -587,11 +591,15 @@ function base ()
           useradd -c "Lab User 3" -m -s /bin/bash labuser3
           usermod -u 1003 labuser3
           usermod -g labusers1 labuser3
-          usermod -a -G labusers3 labuser3
+          usermod -a -G labusers2 labuser3
           echo "labuser3:${l_LABUSER_PASS}" | chpasswd
      else
           warning "A previous lab enviornment may not have been cleaned up corretly."
      fi
+
+     # Reapply error trapping.
+     set -e
+     set -u
 
      # CREATE DIRECTORY
      info "  Creating the lab directories and symlink."
