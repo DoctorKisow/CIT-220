@@ -52,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.11"
+g_VERSION="0.0.12"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -256,7 +256,7 @@ function process_command_line_options ()
                -r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
                -u) g_ARG_UPDATE=1; shift ;;
                -v) print_version >&2; cleanup_and_exit_with_code 1 ;;
-               -z) g_ARG_FINISH_INSTALL=1 shift ;;
+               -z) g_ARG_FINISH_INSTALL=1; shift ;;
                --) shift; break ;;
           esac
      done
@@ -4337,7 +4337,7 @@ if ((g_ARG_INSTALL==1)); then
      else
           info "Finishing the installation of the lab enviornment."
      fi
-     
+
      # Is this linux a supported device? If not, error and quit.
      if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
           error "You are attempting to run this script on a device that is not supported."
@@ -4354,7 +4354,7 @@ if ((g_ARG_INSTALL==1)); then
           warning "This option can only be run by your instructor."
           cleanup_and_exit_with_code 1
      fi
-echo "gafi: " $g_ARG_FINISH_INSTALL
+
      if ! ((g_ARG_FINISH_INSTALL==1)); then
           if [ -n "$g_INSTALL_DATE" ]; then
                printf "The install date of this lab was on: $g_INSTALL_DATE\n"
