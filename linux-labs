@@ -26,14 +26,19 @@
 #
 # SCSI1: 20Gb     /dev/sda1     1Gb     /boot/efi
 #                 /dev/sda2     19Gb    /
-# SCSI2: 256Mb    /dev/sdb1             /Lab Files/CH12
-# SCSI3: 256Mb    LAB18-01
+# SCSI2: 128Mb    /dev/sdb1             /Lab Files/CH12
+# SCSI3: 128Mb    LAB18-01
 # SCSI4: 128Mb    LAB19-01      LVM
 # SCSI5: 128Mb    LAB19-01      LVM
-# SCSI6: 64Mb     LAB19-02      RAID
-# SCSI7: 64Mb     LAB19-02      RAID
-# SCSI8: 64Mb     LAB19-02      RAID
+# SCSI6: 128Mb    LAB19-02      RAID
+# SCSI7: 128Mb    LAB19-02      RAID
+# SCSI8: 128Mb    LAB19-02      RAID
 # ##############################################################################
+
+# !!!!!!!!!!!!
+# ! ssh still disabled in base
+# ! need to change lab paths
+
 
 # Scroll to the bottom of this script to follow the main script flow.
 
@@ -73,8 +78,13 @@ if [[ -v TERM && -n "${TERM}" && "${TERM}" != "dumb" ]]; then
     g_ALERT_TEXT="$(tput bel)"
 fi
 
-# (g_LAB_PATH) - String that holds the location to the lab files.
-g_LAB_PATH="/Lab Files"
+# (g_LAB_PATH) - Strings that hold the location to the lab files.
+#g_LAB_PATH="/Lab Files"
+#g_LAB_SYMLINK="/labs"
+g_LAB_PATH="/home/mkisowa/Lab Files" #TESTING
+g_LAB_SYMLINK="/home/mkisowa/labs"   #TESTING
+g_DIR_PREFIX="CH"
+g_LAB_PREFIX="LAB"
 
 # (g_PREFIXSTRING) - String value used to indicate what is appended to the output at the beginning of screen output during script execution.
 g_PREFIXSTRING="*  "
@@ -99,6 +109,7 @@ declare -i g_ARG_GRADE=0
 declare -i g_ARG_ROLLBACK=0
 
 declare g_FIRST_TOKEN=""
+declare g_INSTALL_DATE=""
 
 # ********************************** functions *********************************
 # (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
@@ -122,8 +133,7 @@ function warning ()
      echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}WARNING: ${1}" >&2
 }
 
-# (error) - Function for the error catching routine, display an error cleanup
-# and exit the script.
+# (error) - Function for the error catching routine, display an error cleanup and exit the script.
 function error ()
 {
     echo
@@ -132,7 +142,6 @@ function error ()
 }
 
 # (cleanup_and_exit_with_code) - Function used to properly cleanup the enviornment after an error; the passed value are 1 (error) or 0 (normal).
-# (cleanup_and_exit_with_code) - Function used to cleanup the enviornment when an error condition is encountered.
 function cleanup_and_exit_with_code ()
 {
      # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
@@ -299,6 +308,81 @@ function internal_consistency_option_checks ()
      done
 }
 
+# (test_yn) - Function used to test for a "y" or "n" input from the keyboard.
+function test_yn ()
+{
+     # (l_REPLY) - Local string value used to hold the response from the keyboard.
+     local l_REPLY=""
+
+     echo -n -e "${g_SHOWPREFIX}${1} (y/n)? ${g_ALERT_TEXT}"
+     read -r -n 1
+     echo
+     if [[ ${l_REPLY} =~ ^[Yy]$ ]]; then
+          return 1
+     else
+          return 0
+     fi
+}
+
+# (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
+function test_user ()
+{
+     # (l_USER) - Local string value used to hold the username passed in from $1.
+     local l_USER="$1"
+
+     if id -u "$l_USER" >/dev/null 2>&1; then
+          userdel "$l_USER"
+          rm -r -f "/home/$l_USER"
+     fi
+}
+
+# (test_group) - Function used to test for the existence of a group. Passes arguements ($1) group name.
+function test_group ()
+{
+     # (l_GROUP) - Local string value used to hold the group name passed in from $1.
+     local l_GROUP="$1"
+
+     if [ $(getent group $l_GROUP) ]; then
+          groupdel $l_GROUP
+     fi
+}
+
+# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
+function set_error_trapping ()
+{
+     # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
+     l_BOOL='^[0-1]+$'
+     if ! [[ $1 =~ $l_BOOL ]]; then
+          error "Function: set_error_trapping was passed a value that is out of bounds."
+     fi
+
+     # (l_TRAP) - Local boolean value used to enable and disable how the script
+     # behaves when certain error conditions are met.
+     local l_TRAP="${1}"
+
+     if ((l_TRAP == 0)); then
+          # Disable errors when a command exits with a non-zero status.
+          set +e
+
+          # Disable errors on unbound (undefined) variables.
+          set +u
+
+          # Disable allowing filename patterns that match no files to expand to a null
+          # string, rather than themselves.
+          shopt -u nullglob
+     else
+          # Enable exiting immediately if a command exits with a non-zero status.
+          set -e
+
+          # Enable erroring on unbound (undefined) variables.
+          set -u
+
+          # Enable filename patterns that match no files to expand to a null
+          # string, rather than themselves.
+          shopt -s nullglob
+     fi
+}
+
 # (update) - Function used to check for and update this script from the repository.
 function update ()
 {
@@ -306,9 +390,9 @@ function update ()
      local l_ABS_PATH
      local l_VERSION
 
-     info "Checking for updates to the installation script."
+     info "Checking for updates to the $g_PROGRAM_NAME script."
 
-     cd ${g_SCRIPT_PATH}
+     cd "${g_SCRIPT_PATH}"
 
      # Get a new version of the script.
      l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
@@ -329,7 +413,7 @@ function update ()
           chmod +x updater.sh
           chmod 770 "$l_TMP_FILE"
           chown root:labusers1 "$l_TMP_FILE"
-          exec /bin/bash $g_SCRIPT_PATH/updater.sh
+          exec /bin/bash "$g_SCRIPT_PATH/updater.sh"
      else
           rm -f "$l_TMP_FILE"
      fi
@@ -344,7 +428,7 @@ function update_notice ()
      local l_ABS_PATH
      local l_VERSION
 
-     cd ${g_SCRIPT_PATH}
+     cd "${g_SCRIPT_PATH}"
 
      # Get a new version of the script.
      l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
@@ -356,7 +440,7 @@ function update_notice ()
      if [ "$g_VERSION" \< "$l_VERSION" ]; then
           info "There is a new version v$l_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
      else
-          info "You are at the current version of this script.\n\n"
+          info "You are running the current version of this script.\n\n"
 
           if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
                rm "${g_SCRIPT_PATH}/updater.sh"
@@ -366,239 +450,660 @@ function update_notice ()
      rm -f $l_TMP_FILE
 }
 
+# (create directory) - Passed arguements ($1) the book chapter number.
+function create_directory ()
+{
+     local l_CH_NUM="$1"
+
+     # Verify the function was passed a valid lab number.
+     if ! (( l_CH_NUM >= 1 && l_CH_NUM <= 29 )); then
+          error "Function: was passed an expression that was out of range."
+     fi
+
+     # If we are passed a single digit number, prefix it with a zero.
+     l_CH_NUM=$(printf '%02d' $((l_CH_NUM)))
+
+     # Set the working directory.
+     l_WORKING_DIRECTORY="$g_LAB_PATH/$g_DIR_PREFIX$l_CH_NUM"
+
+     # Create the directory.
+     if ! [[ -d "$l_WORKING_DIRECTORY" ]]; then
+          mkdir "$l_WORKING_DIRECTORY"
+     fi
+
+     # Return the created directories path.
+     echo "$l_WORKING_DIRECTORY"
+}
+
+# (create_lab) - Passed arguements ($1) the lab number ($2) optional sets increment.
+function create_lab ()
+{
+     local l_LAB_NUM="$1"
+     local l_LAB_NUM_INC=${2:-"1"}
+     local l_LAB=""
+
+     # Verify the function was passed a valid lab number.
+     if ! (( l_LAB_NUM >= 1 && l_LAB_NUM <= 29 )); then
+          error "Function: was passed an expression that was out of range."
+     fi
+
+     # If we are passed a single digit number, prefix it with a zero.
+     l_LAB_NUM=$(printf '%02d' $((l_LAB_NUM)))
+
+     # If we are passed a single digit number, prefix it with a zero.
+     l_LAB_NUM_INC=$(printf '%02d' $((l_LAB_NUM_INC)))
+
+     # Set the lab number.
+     l_LAB="$g_LAB_PREFIX$l_LAB_NUM-$l_LAB_NUM_INC"
+
+     # Return the lab number.
+     echo $l_LAB
+}
+
 # ##############################################################################
-# SYSTEM BASE - Setup system for the rest of the labs.
+# SYSTEM BASE - Setup system for the rest of the labs. - TODO: TEST SCRIPT MOVE
 function base ()
 {
-     local v_LABUSER_PASS="P@\$\$w0rd"
+     local l_LABUSER_PASS="P@\$\$w0rd"
+     local l_ABS_PATH=""
+     local l_DEV
 
-     # PACKAGES
+     # Ensure we have the necessary block devices available.
+     if [ $(lsblk | grep -o "^sd[a-z]" | wc -l) -ne 8 ]; then
+          error "You do not have  enough block device  available to complete the  labs. LAB12-02, \nLAB18-01,  LAB19-01  and  LAB19-02  require  these  block  devices  to  be  made \navailable. Please add these  block devices before continuing  with installation.\n\nFor information  on how to add these  devices,  please contact your  instructor.\n"
+     fi
+
+     info "Installing the base lab enviornment."
+
+     info "  Installing the required system packages."
      #CH06 (ifconfig)
-     apt -y install net-tools
+     apt -y install net-tools -qq &>/dev/null
      #CH07
-     apt -y install tree
+     apt -y install tree -qq &>/dev/null
      #CH09
-     apt -y install acl
+     apt -y install acl -qq &>/dev/null
      #CH11
-     apt -y install zip
+     apt -y install zip -qq &>/dev/null
      #CH12
-     apt -y install quota
+     apt -y install quota -qq &>/dev/null
      #CH16
-     apt -y install sysstat
+     apt -y install sysstat -qq &>/dev/null
+     apt -y install procinfo -qq &>/dev/null
      #CH20
-     apt -y install network-manager
+     apt -y install network-manager -qq &>/dev/null
      #CH21
-     apt -y install whois
+     apt -y install whois -qq &>/dev/null
      #CH23
-     apt -y install at
+     apt -y install at -qq &>/dev/null
      #CH27
-     apt -y install git
+     apt -y install git -qq &>/dev/null
 
      # ADD GROUPS
-     groupadd labusers1
-     groupadd labusers2
+     info "  Creating security groups."
+     if ! [ $(getent group labuser1) ]; then
+          groupadd -g 1001 labusers1
+     else
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+     fi
+
+     if ! [ $(getent group labuser2) ]; then
+          groupadd -g 1002 labusers2
+     else
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+     fi
 
      # ADD USERS
-     useradd -c "Lab User 1" -m -s /bin/bash labuser1
-     usermod -u 500 labuser1
-     usermod -a -g labusers1 labuser1
-     usermod -a -G labusers2 labuser1
-     usermod -a -G sudo labuser1
-     echo "labuser1:${v_LABUSER_PASS}" | chpasswd
+     if ! [ "`id -u labuser1 2>/dev/null`" ]; then
+          info "  Creating the labuser1 account."
+          useradd -c "Lab User 1" -m -s /bin/bash labuser1
+          usermod -u 500 labuser1
+          usermod -g labusers1 labuser1
+          usermod -a -G labusers2 labuser1
+          usermod -a -G sudo labuser1
+          echo "labuser1:${l_LABUSER_PASS}" | chpasswd
+     else
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+     fi
 
-     useradd -c "Lab User 2" -m -s /bin/bash labuser2
-     usermod -a -g labusers2 labuser2
-     echo "labuser2:${v_LABUSER_PASS}" | chpasswd
+     if ! [ "`id -u labuser2 2>/dev/null`" ]; then
+          info "  Creating the labuser2 account."
+          useradd -c "Lab User 2" -m -s /bin/bash labuser2
+          usermod -u 1002 labuser2
+          usermod -g labusers2 labuser2
+          echo "labuser2:${l_LABUSER_PASS}" | chpasswd
+     else
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+     fi
 
-     useradd -c "Lab User 3" -m -s /bin/bash labuser3
-     usermod -a -g labusers1 labuser3
-     usermod -a -G labusers2 labuser3
-     echo "labuser3:${v_LABUSER_PASS}" | chpasswd
+     if ! [ "`id -u labuser3 2>/dev/null`" ]; then
+          info "  Creating the labuser3 account."
+          useradd -c "Lab User 3" -m -s /bin/bash labuser3
+          usermod -u 1003 labuser3
+          usermod -g labusers1 labuser3
+          usermod -a -G labusers2 labuser3
+          echo "labuser3:${l_LABUSER_PASS}" | chpasswd
+     else
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+     fi
 
-     # CREATE DIRECTORIES
-     mkdir $g_LAB_PATH
-     ln -s $g_LAB_PATH /labs
+     # CREATE DIRECTORY
+     info "  Creating the lab directories and symlink."
+     if ! [ -d "$g_LAB_PATH" ]; then
+          mkdir "$g_LAB_PATH"
+     fi
+
+     # CREATE SYMLINK
+     if ! [[ -h "$g_LAB_SYMLINK" ]]; then
+          ln -s "$g_LAB_PATH" "$g_LAB_SYMLINK"
+     fi
 
      # SET SECURITY
+     info "  Setting the ownership and permissions for the lab enviornment."
      chown root:labusers1 "$g_LAB_PATH"
      chmod 02755 "$g_LAB_PATH"
 
      # DISABLE SSH (CH05 LAB)
-     systemctl disable ssh.service
-     systemctl stop
+     info "  Disabling the ssh service."
+     #systemctl disable ssh.service
+     #systemctl stop
+
+     # Set a sourceable file that lists the install date.
+     l_TIMESTAMP=$(echo $(date +%d-%b-%Y) | tr '[:lower:]' '[:upper:]')
+     if [ -f "$g_LAB_PATH/.lid" ]; then
+          warning "A previous lab enviornment may not have been cleaned up corretly."
+          rm "$g_LAB_PATH/.lid"
+     fi
+
+     printf "g_INSTALL_DATE=$l_TIMESTAMP\n" >> "$g_LAB_PATH/.lid"
+     chown root:root "$g_LAB_PATH/.lid"
+     chmod 00440 "$g_LAB_PATH/.lid"
+
+     # Create a script to move this script into the labs folder.
+     #l_ABS_PATH="`dirname \"$0\"`"
+     #l_ABS_PATH="`( cd \"$l_ABS_PATH\" && pwd )`"
+
+     # Create script to move installation script to labs directory
+     if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
+          printf '#!/bin/bash\n\n' >> install.sh
+          printf "This script was created by the $g_PROGNAME installation, and can safely be removed.\n" >> install.sh
+          printf "mv \"$g_SCRIPT_PATH/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+          printf "rm \"$g_SCRIPT_PATH/$g_PROGNAME\"\n" >> install.sh
+
+          chmod 750 "$g_SCRIPT_PATH/install.sh"
+          chown mkisowa:labuser1 "$g_SCRIPT_PATH/install.sh"
+          info "running"
+          exec /bin/bash "$g_SCRIPT_PATH/install.sh"
+     fi
 }
 
-# CH01 - Installing (No Labs)
-function chapter_one ()
+# CHAPTER - Name of Chapter - Passed arguements ($1) the operation are we performing, ($2) the chapter/lab number.
+# CH01 - Installing (No Labs) - TODO: Student Install
+function chapter_1 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH01"
-     local v_LAB="$v_Working_Directory/LAB01-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH02 - Package Management (No Labs)
-function chapter_two ()
+function chapter_2 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH02"
-     local v_LAB="$v_Working_Directory/LAB02-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH03 - Virtualization (No Labs)
-function chapter_three ()
+function chapter_3 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH03"
-     local v_LAB="$v_Working_Directory/LAB03-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH04 - The Boot Process (No Labs)
-function chapter_four ()
+function chapter_4 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH04"
-     local v_LAB="$v_Working_Directory/LAB04-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH05 - Managing System Services
-function chapter_five ()
+function chapter_5 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH05"
-     local v_LAB="$v_Working_Directory/LAB05-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     #chown root:labusers1 $v_Working_Directory
-     chmod 00750 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # CREATE LAB - SET PERMISSIONS
-cat > "$v_LAB" << EOF
-LAB:		     LAB05-01
-OBJECTIVE:     The objective of this lab is to learn how to enable and disable, start and stop services, and review system runlevels.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB. Please record\nyour answers on your lab sheet and upload them to blackboard."
 
-1.	Change into the '/labs/CH05' folder.
+              #ANSWERS CH05-01
+
+              #1
+              #systemctl status ssh
+
+              #2
+              #systemctl enable ssh
+
+              #3
+              #systemctl status ssh
+
+              #4
+              #systemctl start ssh
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
+              chmod 00750 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+              cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:        LAB05-01
+OBJECTIVE:  The objective of this lab is to learn how to enable and disable, start and stop services, and review system runlevels.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH05 folder to complete this lab.
 
 SERVICE MANAGEMENT
-2.	Using the systemctl command, check the status of the ssh service.
-     a.	Is the service enabled?
-     b.	Is the service started?
-
-3.	Using the systemctl command, enable the ssh service.
-     a.	What did you observe?
-
-4.	Using the systemctl command, what is the status of the ssh service?
-     a.	Is the service enabled?
-     b.	Is the service started?
-
-5.	Using the systemctl command, start the ssh service.
-     a.	What did you observe?
-
-6.	Using the systemctl command, what is the status of the ssh service?
-     a.	Is the service enabled?
-     b.	Is the service started?
+1.  Using the systemctl command, check the status of the ssh service.
+    a.	Is the service enabled?
+    b.	Is the service started?
+2.  Using the systemctl command, enable the ssh service.
+    a.	What did you observe?
+3.  Using the systemctl command, what is the status of the ssh service?
+    a.	Is the service enabled?
+    b.	Is the service started?
+4.  Using the systemctl command, start the ssh service.
+    a.	What did you observe?
+5.  Using the systemctl command, what is the status of the ssh service?
+    a.	Is the service enabled?
+    b.	Is the service started?
 
 RUNLEVEL MANAGEMENT
-7.	Using the runlevel command, what is the current runlevel?
-     a.	What did you observe?
+6.  Using the runlevel command, what is the current runlevel?
+    a.	What did you observe?
 EOF
 
-     chown root:labusers1 "$v_LAB"
-     chmod 644 "$v_LAB"
-
-     #Answers
-     #2
-     #systemctl status ssh
-     #3
-     #systemctl enable ssh
-     #4
-     #systemctl status ssh
-     #5
-     #systemctl start ssh
-
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              ;;
+     esac
 }
 
 # CH06 - System Performance
-function chapter_six ()
+function chapter_6 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH06"
-     local v_LAB="$v_Working_Directory/LAB06-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     #chown root:labusers1 $v_Working_Directory
-     chmod 02774 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # CREATE SCRIPT
-     printf '#!/bin/bash\n\n' >> "$v_Working_Directory/lab06-01.sh"
-     printf "# LAB6-01 - System Performance\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "# Copyright © 2022 - 2023\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "# Dr. Matthew Kisow\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "# CC BY-NC-ND 4.0\n\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "clear\n\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "echo \"Spawning processes for LAB6-01...\"\n\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "for i in {1..10}; do (lynx ccac.edu > /dev/null) & done\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "while true; do sleep 86400; done\n\n" >> "$v_Working_Directory/lab06-01.sh"
-     printf "exit 0\n" >> "$v_Working_Directory/lab06-01.sh"
+     case "$l_OPER" in
+          -c)
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
+          -g)
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
 
-     chmod 00774 "$v_Working_Directory/lab06-01.sh"
+               #ANSWERS LAB06-01
+               #1
+               #free
 
-     # CREATE LAB - SET PERMISSIONS
-cat > "$v_LAB" << EOF
+               #2
+               #free -h
+
+               #3
+               #free --lohi
+
+               #5
+               #ps -A | grep lynx
+
+               #6
+               #pstree lynx
+
+               #7
+               #ps -A | grep lab6-01.sh
+
+               #8
+               #kill -9 <PID>
+               #ps -A | grep lab6-01.sh
+               #ps -A | grep lynx
+
+               #10
+               #ps -A | grep lynx
+               #kill <PID>
+               #kill -9 <PID>
+               #ps -A | grep lynx
+               #kill -9 <PID> (MAIN LYNX PID)
+               #ps -A | grep lynx
+               #kill -9 <PID> (SCRIPT PID)
+
+               #12
+               #top
+               #u
+               #labuser1
+               #q
+
+               #13
+               #ps aux | grep lab6-01.sh
+
+               #14
+               #renice <PID> 5
+
+               #15
+               #ps aux | grep lab6-01.sh
+
+               #16
+               #u
+               #labuser1
+               #k
+               #<PID>
+               #9
+
+               #17
+               #pstree labuser1
+
+               #18
+               #screen
+               #[ESC]
+
+               #19
+               #pstree labuser1
+
+               #20
+               #[CTRL]+[A] and [CTRL]+[C]
+               #top
+               #[CTRL]+[A] [P]
+
+               #21
+               #lynx ccac.edu
+               #[CTRL]+[A] [P]
+
+               #22
+               #[CTRL]+[A]+["]
+               #[1]+[ENTER]
+
+               #23
+               #[CTRL]+[A]+["]
+               #[2] + [ENTER]
+               ;;
+          -i)
+               info "Setting up the labs for chapter: $l_CH_NUM."
+
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 $l_WORKING_DIRECTORY
+               chmod 02774 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+               # CREATE SCRIPT
+               printf '#!/bin/bash\n\n' >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "# LAB6-01 - System Performance\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "# Copyright © 2022 - 2023\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "# Dr. Matthew Kisow\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "# CC BY-NC-ND 4.0\n\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "clear\n\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "echo \"Spawning processes for LAB6-01...\"\n\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "for i in {1..10}; do (lynx ccac.edu > /dev/null) & done\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "while true; do sleep 86400; done\n\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               printf "exit 0\n" >> "$l_WORKING_DIRECTORY/lab06-01.sh"
+               chmod 00750 "$l_WORKING_DIRECTORY/lab06-01.sh"
+
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB06-01
+OBJECTIVE:  The objective of this lab is to learn how to assess system performance and create/terminate processes.
+
 * You should be logged in as labuser1 with the password of ‘P@$$w0rd’
-* To complete this lab, you must be in the CH06 folder.
-
-1.	Change into the '/labs/CH06' folder.
+* To complete this lab, you must be in the /labs/CH06 folder.
 
 MEMORY MANAGEMENT
-2.	Using the free command, check how much memory and virtual memory are available on the system.
+1.	Using the free command, check how much memory and virtual memory are available on the system.
      a.	How much of this did you understand?
 
-3.	Using the free command and the switch that puts these values into a human-readable format, check how much memory and virtual memory are available on the system.
+2.	Using the free command and the switch that puts these values into a human-readable format, check how much memory and virtual memory are available on the system.
      a.	Is it more readable now?
 
-4.	Using the free command and the switch that shows the low and high values, determine how much memory and virtual memory are available.
+3.	Using the free command and the switch that shows the low and high values, determine how much memory and virtual memory are available.
      a.	What do you see?
      b.	Is it more readable now?
 
 PROCESS MANAGEMENT
-5.	Execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
-6.	Pipe the output of the ps command to the grep command listing only the lynx process.
+4.	Execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
+5.	Pipe the output of the ps command to the grep command listing only the lynx process.
      a.	What did you observe?
-7.	Using the pstree command, list the lynx process.
+6.	Using the pstree command, list the lynx process.
      a.	What did you observe?
-8.	Pipe the output of the ps command to the grep command listing only the lab06-01.sh script's process.
+7.	Pipe the output of the ps command to the grep command listing only the lab06-01.sh script's process.
      a.	What did you observe?
      b.	Find the PID of lab06-01.sh script from the output of the previous command.
-9.	Using the kill command, the signal 9 switch (terminate immediately), and the PID from the previous command terminate the lab06-01.sh scripts process.
+8.	Using the kill command, the signal 9 switch (terminate immediately), and the PID from the previous command terminate the lab06-01.sh scripts process.
      a.	Run the commands you used in steps 6 and 8 again.
      b.	What did you observe?
  
-10.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
-11.	Using the kill and killall commands, follow the steps below:
+9.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background.
+10.	Using the kill and killall commands, follow the steps below:
      a.	List all of the lynx processes.
      b.	Terminate one of those processes using the kill <PID> command.
      c.	Terminate another lynx process this time using the signal 9 switch.
@@ -610,16 +1115,16 @@ PROCESS MANAGEMENT
      i.	Now terminate lab06-01.sh process.
 
 PROCESS PRIORITY
-12.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background
-13.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
+11.	Again, execute the script in this folder by typing ./lab06-01.sh & at the command prompt. This script spawns several lynx web browsers in the background
+12.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
      a.	Filter the processes out, focusing on user labuser1.
      b.	What do you observe?
      c.	Exit top.
-14.	Pipe the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
-15.	Use the renice command, to change the priority of lab06-01.sh PID to 5.
-16.	Pipe and scrutinize the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
+13.	Pipe the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
+14.	Use the renice command, to change the priority of lab06-01.sh PID to 5.
+15.	Pipe and scrutinize the output of the ps command using the user process switch to the grep command listing only the lab06-01.sh script's process.
      a.	What changed?
-17.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
+16.	Using the top command, see if the lynx or lab06-01.sh process is one of the top processes.
      a.	Filter the processes out, focusing on user labuser1.
      b.	What do you observe this time?
      c.	From top, find and terminate using signal 9 the lab6-01.sh process.
@@ -628,290 +1133,248 @@ PROCESS PRIORITY
      f.	Exit top.
  
 SCREEN
-18.	Using the pstree command, list the processes for labuser1.
+17.	Using the pstree command, list the processes for labuser1.
      a.	What do you observe?
-19.	Type the screen command, and start the screen virtual window manager.
+18.	Type the screen command, and start the screen virtual window manager.
      a.	Type [ESC] to continue.
-20.	Using the pstree command, list the processes for labuser1.
+19.	Using the pstree command, list the processes for labuser1.
      a.	What do you observe?
-21.	Start a new virtual screen session.
+20.	Start a new virtual screen session.
      a.	Start the top program.
      b.	While in the top program, move back to the previous screen.
-22.	Start a new virtual screen session.
+21.	Start a new virtual screen session.
      a.	Start the lynx program and navigate to ccac.edu.
      b.	While in the lynx program, move back to the previous screen.
-23.	List the virtual consoles.
+22.	List the virtual consoles.
      a.	Choose the first one “1”.
      b.	What screen are you on?
      c.	Exit the top program, then type the exit command.
-24.	List the virtual consoles again.
+23.	List the virtual consoles again.
      a.	Choose the second one “2”.
      b.	What screen are you on?
      c.	Quit the lynx program, then type the exit command.
-25.	Exit the screen virtual screen session.
+24.	Exit the screen virtual screen session.
      a.	Type the exit command.
 
 # Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB"
-     chmod 644 "$v_LAB"
-
-     #Answers
-     #2
-     #free
-
-     #3
-     #free -h
-
-     #4
-     #free --lohi
-
-     #6
-     #ps -A | grep lynx
-
-     #7
-     #pstree lynx
-
-     #8
-     #ps -A | grep lab6-01.sh
-
-     #9
-     #kill -9 <PID>
-     #ps -A | grep lab6-01.sh
-     #ps -A | grep lynx
-
-     #11
-     #ps -A | grep lynx
-     #kill <PID>
-     #kill -9 <PID>
-     #ps -A | grep lynx
-     #kill -9 <PID> (MAIN LYNX PID)
-     #ps -A | grep lynx
-     #kill -9 <PID> (SCRIPT PID)
-
-     #13
-     #top
-     #u
-     #labuser1
-     #q
-
-     #14
-     #ps aux | grep lab6-01.sh
-
-     #15
-     #renice <PID> 5
-
-     #16
-     #ps aux | grep lab6-01.sh
-
-     #17
-     #u
-     #labuser1
-     #k
-     #<PID>
-     #9
-
-     #18
-     #pstree labuser1
-
-     #19
-     #screen
-     #[ESC]
-
-     #20
-     #pstree labuser1
-
-     #21
-     #[CTRL]+[A] and [CTRL]+[C]
-     #top
-     #[CTRL]+[A] [P]
-
-     #22
-     #lynx ccac.edu
-     #[CTRL]+[A] [P]
-
-     #23
-     #[CTRL]+[A]+["]
-     #[1]+[ENTER]
-
-     #24
-     #[CTRL]+[A]+["]
-     #[2] + [ENTER]
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
+          -r)
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
+     esac
 }
 
-# CH07 - File Manipulation
-function chapter_seven ()
+# CH07 - File Manipulation - TODO: GRADING, RESET
+function chapter_7 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH07"
-     local v_LAB="$v_Working_Directory/LAB7-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     cd /
-     cd labs
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     #chown root:labusers1 "$v_Working_Directory"
-     #chmod 02755 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # CREATE FILE STRUCTURE
-     mkdir "$v_Working_Directory/Christopher Pike"
-     mkdir "$v_Working_Directory/James T. Kirk"
-     mkdir "$v_Working_Directory/Montgomery Scott"
-     mkdir "$v_Working_Directory/Hikaru Sulu"
-     mkdir "$v_Working_Directory/Nyota Uhura"
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-     mkdir "$v_Working_Directory/Starfleet Federation"
-     # STARFLEET STRUCTURE (Done In Lab).
-     #mkdir "$v_Working_Directory/Starfleet Federation/Federation Ships"
-     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel"
-     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel/Capitans"
-     #mkdir "$v_Working_Directory/Starfleet Federation/Personnel/Officers"
+              #Answers
+              #7
+              #mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
+              #mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel"
+              #mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans"
+              #mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Officers"
 
-     mkdir "$v_Working_Directory/numbered"
-     #mkdir -p "$v_Working_Directory/numbered/{1..9}/{1..9}"
+              #9
+              #mkdir -p "$l_WORKING_DIRECTORY/numbered/{1..9}/{1..9}"
 
-     mkdir "$v_Working_Directory/difference"
-     mkdir -p "$v_Working_Directory/difference"/{1..3}
-     touch "$v_Working_Directory/difference"/README
-     mkdir -p "$v_Working_Directory/difference/1"/{1..3}
-     touch "$v_Working_Directory/difference/1"/file{1..2}.{txt,html}
-     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/1/file3.html"
-     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/1/file2.html"
-     printf '<head>\nHello Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/1/file3.html"
-     printf '7h3 qu1ck 8r0wn f0x jump5 0ver 7h3 142y d09!\n' > "$v_Working_Directory/difference/1/file3.txt"
-     mkdir -p "$v_Working_Directory/difference/2"/{1..5}
-     touch "$v_Working_Directory/difference/2"/file{1..5}.{txt,html}
-     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/2/file1.html"
-     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/2/file2.html"
-     printf '<head>\nHello Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/2/file3.html"
-     printf '<head>\nGoodbye Eros!\n<\head>\n' > "$v_Working_Directory/difference/2/file4.html"
-     printf '<head>\nGoodbye Athena!\n<\head>\n' > "$v_Working_Directory/difference/2/file5.html"
-     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/2/file4.txt"
-     mkdir -p "$v_Working_Directory/difference/3"/{1..7}
-     touch "$v_Working_Directory/difference/3"/file{1..7}.{txt,html}
-     printf '<head>\nHello Zeus!\n<\head>\n' > "$v_Working_Directory/difference/3/file1.html"
-     printf '<head>\nHello Hera!\n<\head>\n' > "$v_Working_Directory/difference/3/file2.html"
-     printf '<head>\nGoodbye Aphrodite!\n<\head>\n' > "$v_Working_Directory/difference/3/file3.html"
-     printf '<head>\nHello Eros!\n<\head>\n' > "$v_Working_Directory/difference/3/file4.html"
-     printf '<head>\nGoodbye Athena!\n<\head>\n' > "$v_Working_Directory/difference/3/file5.html"
-     printf '<head>\nHello Hephaestus!\n<\head>\n' > "$v_Working_Directory/difference/3/file6.html"
-     printf '<head>\nGoodbye Ares!\n<\head>\n' > "$v_Working_Directory/difference/3/file7.html"
-     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/3/file1.txt"
-     printf '7h3 qu1ck 8r0wn f0x jump5 0v3r 7h3 142y d09!\n' > "$v_Working_Directory/difference/3/file2.txt"
-     printf 'The quick brown fox jumps over the lazy dog!\n' > "$v_Working_Directory/difference/3/file4.txt"
+              #12
+              # Soft Link Enterprise-A from JTK (Done In Lab).
+              #ln -s "$g_LAB_PATH/$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Montgomery Scott/USS Enterprise-A"
 
-     # USS Enterprise Quotes
-     printf "Our mission? We explore. We seek out new life and new civilizations. We boldly go where no one has gone before.\n– Christopher Pike, 2259\n\n" >> "$v_Working_Directory/Christopher Pike/USS Enterprise"
-     printf "All I ask is a tall ship and a star to steer her by.\n– James T. Kirk, 2268" >> "$v_Working_Directory/Christopher Pike/USS Enterprise"
+              # Move Capitans to Capitans (Done In Lab)
+              #mv "$l_WORKING_DIRECTORY/Christopher Pike" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
+              #mv "$l_WORKING_DIRECTORY/James T. Kirk" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
+              #mv "$l_WORKING_DIRECTORY/Montgomery Scott" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
+              #mv "$l_WORKING_DIRECTORY/Hikaru Sulu" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
+              #mv "$l_WORKING_DIRECTORY/Nyota Uhura" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
+              #rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise"
+              #rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
 
-     touch "$v_Working_Directory/Christopher Pike/USS Discovery"
+              # USS Discovery
+              #mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Discovery" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Discovery" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
 
-     # Hard Link
-     ln "$v_Working_Directory/Christopher Pike/USS Enterprise" "$v_Working_Directory/James T. Kirk/USS Enterprise"
+              # USS Enterprise
+              #mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
 
-     # USS Enterprise-A Quotes
-     printf "My friends, we've come home.\n– James T. Kirk, 2286" >> "$v_Working_Directory/James T. Kirk/USS Enterprise-A"
+              # USS Enterprise-A
+              #mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise-A" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
 
-     # USS Excelsior Quotes
-     printf "My God, that's a big ship.\nNot so big as her captain, I think.\n– Leonard McCoy and Montgomery Scott, 2293" >> "$v_Working_Directory/Montgomery Scott/USS Excelsior"
+              # USS Excelsior
+              #mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/"
 
-     # Soft Link Enterprise-A from JTK (Done In Lab).
-     #ln -s "$g_LAB_PATH/$v_Working_Directory/James T. Kirk/USS Enterprise-A" "$v_Working_Directory/Montgomery Scott/USS Enterprise-A"
+              # USS Leondegrance
+              #mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
+              #ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/"
 
-     # Soft Link
-     ln -s "$v_Working_Directory/Montgomery Scott/USS Excelsior" "$v_Working_Directory/Hikaru Sulu/USS Excelsior"
-     touch "$v_Working_Directory/Nyota Uhura/USS Leondegrance"
+              #13
+              #find /labs/CH07/difference/ -iname *.html | tree
 
-     # SET SECURITY
-     chown labuser1:labusers1 -R "$v_Working_Directory"/*
-     chmod 00755 -R "$v_Working_Directory"/*
+              #14
+              #find /labs/CH07/difference/ -name *.html -exec grep -iw Hello {} \;
+              #find /labs/CH07/difference/ -name *.html -exec grep -iw Zeus {} \;
+              #find /labs/CH07/difference/ -name *.html -exec grep -iw Aphrodite {} \;
+              #find /labs/CH07/difference/ -name *.html -exec grep -iw "<head>" {} \;
 
-     # Move Capitans to Capitans (Done In Lab)
-     #mv "$v_Working_Directory/Christopher Pike" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
-     #mv "$v_Working_Directory/James T. Kirk" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
-     #mv "$v_Working_Directory/Montgomery Scott" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
-     #mv "$v_Working_Directory/Hikaru Sulu" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
-     #mv "$v_Working_Directory/Nyota Uhura" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/"
-     #rm "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise"
-     #rm "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
+              #15
+              #find /labs/CH07/difference/ -name *.txt -exec grep -iw fox {} \;
+              #find /labs/CH07/difference/ -name *.txt -exec grep -iw 7h3 {} \;
+              ;;
+          -i)
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-     # USS Discovery
-     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Discovery" "$v_Working_Directory/Starfleet Federation/Federation Ships/"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Discovery" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-     # USS Enterprise
-     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Federation Ships"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 $l_WORKING_DIRECTORY
+               #chmod 02774 "$l_WORKING_DIRECTORY"
 
-     # USS Enterprise-A
-     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise-A" "$v_Working_Directory/Starfleet Federation/Federation Ships"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Enterprise-A" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
+               # CREATE LAB - SET PERMISSIONS
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-     # USS Excelsior
-     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Montgomery Scott/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Federation Ships"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Montgomery Scott/"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Excelsior" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/"
+               # CREATE FILE STRUCTURE
+               # Ship Capitans Directories
+               mkdir "$l_WORKING_DIRECTORY/Christopher Pike"
+               mkdir "$l_WORKING_DIRECTORY/James T. Kirk"
+               mkdir "$l_WORKING_DIRECTORY/Montgomery Scott"
+               mkdir "$l_WORKING_DIRECTORY/Hikaru Sulu"
+               mkdir "$l_WORKING_DIRECTORY/Nyota Uhura"
 
-     # USS Leondegrance
-     #mv "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Nyota Uhura/USS Leondegrance" "$v_Working_Directory/Starfleet Federation/Federation Ships"
-     #ln -s "$v_Working_Directory/Starfleet Federation/Federation Ships/USS Leondegrance" "$v_Working_Directory/Starfleet Federation/Personnel/Capitans/Nyota Uhura/"
+               # Starfleet Federation Directory
+               mkdir "$l_WORKING_DIRECTORY/Starfleet Federation"
 
-     # Searching (Done In Lab).
-     #find /labs/CH07/difference/ -iname *.html | tree
+               # Numbered Directory
+               mkdir "$l_WORKING_DIRECTORY/numbered"
 
-     #find /labs/CH07/difference/ -name *.html -exec grep -iw Hello {} \;
-     #find /labs/CH07/difference/ -name *.html -exec grep -iw Zeus {} \;
-     #find /labs/CH07/difference/ -name *.html -exec grep -iw Aphrodite {} \;
-     #find /labs/CH07/difference/ -name *.html -exec grep -iw "<head>" {} \;
+               # Difference Directory
+               mkdir "$l_WORKING_DIRECTORY/difference"
+               mkdir -p "$l_WORKING_DIRECTORY/difference"/{1..3}
+               touch "$l_WORKING_DIRECTORY/difference"/README
+               mkdir -p "$l_WORKING_DIRECTORY/difference/1"/{1..3}
+               touch "$l_WORKING_DIRECTORY/difference/1"/file{1..2}.{txt,html}
+               printf '<head>\nHello Zeus!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/1/file3.html"
+               printf '<head>\nHello Hera!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/1/file2.html"
+               printf '<head>\nHello Aphrodite!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/1/file3.html"
+               printf '7h3 qu1ck 8r0wn f0x jump5 0ver 7h3 142y d09!\n' > "$l_WORKING_DIRECTORY/difference/1/file3.txt"
+               mkdir -p "$l_WORKING_DIRECTORY/difference/2"/{1..5}
+               touch "$l_WORKING_DIRECTORY/difference/2"/file{1..5}.{txt,html}
+               printf '<head>\nHello Zeus!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/2/file1.html"
+               printf '<head>\nHello Hera!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/2/file2.html"
+               printf '<head>\nHello Aphrodite!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/2/file3.html"
+               printf '<head>\nGoodbye Eros!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/2/file4.html"
+               printf '<head>\nGoodbye Athena!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/2/file5.html"
+               printf 'The quick brown fox jumps over the lazy dog!\n' > "$l_WORKING_DIRECTORY/difference/2/file4.txt"
+               mkdir -p "$l_WORKING_DIRECTORY/difference/3"/{1..7}
+               touch "$l_WORKING_DIRECTORY/difference/3"/file{1..7}.{txt,html}
+               printf '<head>\nHello Zeus!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file1.html"
+               printf '<head>\nHello Hera!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file2.html"
+               printf '<head>\nGoodbye Aphrodite!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file3.html"
+               printf '<head>\nHello Eros!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file4.html"
+               printf '<head>\nGoodbye Athena!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file5.html"
+               printf '<head>\nHello Hephaestus!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file6.html"
+               printf '<head>\nGoodbye Ares!\n<\head>\n' > "$l_WORKING_DIRECTORY/difference/3/file7.html"
+               printf 'The quick brown fox jumps over the lazy dog!\n' > "$l_WORKING_DIRECTORY/difference/3/file1.txt"
+               printf '7h3 qu1ck 8r0wn f0x jump5 0v3r 7h3 142y d09!\n' > "$l_WORKING_DIRECTORY/difference/3/file2.txt"
+               printf 'The quick brown fox jumps over the lazy dog!\n' > "$l_WORKING_DIRECTORY/difference/3/file4.txt"
 
-     #find /labs/CH07/difference/ -name *.txt -exec grep -iw fox {} \;
-     #find /labs/CH07/difference/ -name *.txt -exec grep -iw 7h3 {} \;
+               # USS Enterprise Quotes
+               printf "Our mission? We explore. We seek out new life and new civilizations. We boldly go where no one has gone before.\n– Christopher Pike, 2259\n\n" >> "$l_WORKING_DIRECTORY/Christopher Pike/USS Enterprise"
+               printf "All I ask is a tall ship and a star to steer her by.\n– James T. Kirk, 2268" >> "$l_WORKING_DIRECTORY/Christopher Pike/USS Enterprise"
 
-     # CREATE LAB - SET PERMISSIONS
-cat > "$v_LAB" << EOF
-LAB:		    LAB07-01
-OBJECTIVE:    The objective of this lab is to learn how to navigate, create and delete files and folders, symbolic links, and structure from the command line.
+               touch "$l_WORKING_DIRECTORY/Christopher Pike/USS Discovery"
+
+               # Hard Link
+               ln "$l_WORKING_DIRECTORY/Christopher Pike/USS Enterprise" "$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise"
+
+               # USS Enterprise-A Quotes
+               printf "My friends, we've come home.\n– James T. Kirk, 2286" >> "$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise-A"
+
+               # USS Excelsior Quotes
+               printf "My God, that's a big ship.\nNot so big as her captain, I think.\n– Leonard McCoy and Montgomery Scott, 2293" >> "$l_WORKING_DIRECTORY/Montgomery Scott/USS Excelsior"
+
+               # Soft Link
+               ln -s "$l_WORKING_DIRECTORY/Montgomery Scott/USS Excelsior" "$l_WORKING_DIRECTORY/Hikaru Sulu/USS Excelsior"
+               touch "$l_WORKING_DIRECTORY/Nyota Uhura/USS Leondegrance"
+
+               # SET SECURITY
+               chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY"/*
+               chmod 00755 -R "$l_WORKING_DIRECTORY"/*
+
+               # CREATE LAB - SET PERMISSIONS
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:        LAB07-01
+OBJECTIVE:  The objective of this lab is to learn how to navigate, create and delete files and folders, symbolic links, and structure from the command line.
 
 * You should be logged in as labuser1 with the password of ‘P@$$w0rd’
 * To complete this lab, you must be in the CH07 folder.
 
-1.	Change into the '/labs/CH07' folder.
-
 TREES AND FILE LISTINGS
-2.	Using the tree command, map the structure of the CH07 folder.
-3.	Interrogate each folder:
+1.   Using the tree command, map the structure of the CH07 folder.
+2.   Interrogate each folder:
      a.	What are these folders' groups and user ownership?
      b.	Are there any symbolic links?
      c.	What do those links look like?
-4.	Interrogate the inodes of the files in the Hikaru Sulu and Montgomery Scott folders.
+3.   Interrogate the inodes of the files in the Hikaru Sulu and Montgomery Scott folders.
      a.	What is the inode of the USS Excelsior file in both folders?
      b.	What kind of link is this?
      c.	What do you notice about the pathname of the symbolic link in the Hikaru Sulu folder?
-5.	Interrogate the inodes of the files in the Christopher Pike and James T. Kirk folders.
+4.   Interrogate the inodes of the files in the Christopher Pike and James T. Kirk folders.
      a.	What is the inode of the USS Enterprise file in both folders?
      b.	What kind of link is this?
-6.	Navigate to the 'Montgomery Scott' folder.
+5.   Navigate to the 'Montgomery Scott' folder.
      a.	Create a link to the USS Enterprise-A in the James T. Kirk folder.
-7.	Navigate to the Nyota Uhura folder.
+6.   Navigate to the Nyota Uhura folder.
      a.	Using the touch command, update the date and time stamp of the USS Leondegrance file to January 1, 2288.
-b.	Create an empty file called USS Gallant in this folder.
+     b.	Create an empty file called USS Gallant in this folder.
 
 CREATING FOLDERS
-8.	Create the following folder structure under the 'Starfleet Federation' folder.
+7.   Create the following folder structure under the 'Starfleet Federation' folder.
      Starfleet Federation/
      |-- Federation Ships
      \-- Personnel
          |-- Captains
          \-- Officers
-         a.	How many commands did you type?
-9.	Remove the Personnel directory.
+     a.	How many commands did you type?
+8.	Remove the Personnel directory.
  
-10.	Create nine directories in the numbered directory numbered one through nine, with nine sub-directories numbered one through nine in each.
-numbered
+9.	Create nine directories in the numbered directory numbered one through nine, with nine sub-directories numbered one through nine in each.
+     numbered
      |-- 1
      |   |-- 1
      |   .
@@ -929,16 +1392,16 @@ numbered
         .
         .
         \--9
-        a.	Were you able to create it using one command?
+     a.	Were you able to create it using one command?
 
 DIFFERENCE
-11.	Using the diff command, what is the difference between directories one through three?
+10.  Using the diff command, what is the difference between directories one through three?
 
 MOVING AND REMOVING OBJECTS
-12.	From the root of the CH07 folder, move the Starfleet captains under the Starfleet Federation/Personnel/Capitans folder.
-13.	Under each Starfleet Captain, move the ship file under the Starfleet Federation/Federation Ships folder and create a symbolic link under each Captain to their ship.  Use the diagram (below) to help you.
+11.  From the root of the CH07 folder, move the Starfleet captains under the Starfleet Federation/Personnel/Capitans folder.
+12.  Under each Starfleet Captain, move the ship file under the Starfleet Federation/Federation Ships folder and create a symbolic link under each Captain to their ship.  Use the diagram (below) to help you.
 
-NOTE: Recall that the USS Enterprise under James T. Kirk is a hard link, and the USS Excelsior is a soft link or symbolic-link under Hikaru Sulu. Remove these links first, then recreate them once the ship has been moved to the 'Federation Ships' directory.
+     NOTE: Recall that the USS Enterprise under James T. Kirk is a hard link, and the USS Excelsior is a soft link or symbolic-link under Hikaru Sulu. Remove these links first, then recreate them once the ship has been moved to the 'Federation Ships' directory.
 
      /Starfleet Federation/
      |-- Federation Ships
@@ -964,13 +1427,13 @@ NOTE: Recall that the USS Enterprise under James T. Kirk is a hard link, and the
         \--Officers
  
 SEARCHING
-14.	Find all text files in the difference directory and sub-directories. Once done, pipe the output to the tree command.
-15.	Find all .html files in the difference directory and sub-directories with the word:
+13.  Find all text files in the difference directory and sub-directories. Once done, pipe the output to the tree command.
+14.  Find all .html files in the difference directory and sub-directories with the word:
      a.	"Hello" in them.
      b.	"Zeus" in them.
      c.	"Aphrodite" in them.
      d.	"<head>" in them.
-16.	Find all .txt files in the difference directory and sub-directories with the word:
+15.  Find all .txt files in the difference directory and sub-directories with the word:
      a.	"fox" in them.
      b.	"7h3" in them.
 
@@ -978,32 +1441,94 @@ SEARCHING
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB"
-     chmod 644 "$v_LAB"
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH08 - File Processing
-function chapter_eight ()
+function chapter_8 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH08"
-     local v_LAB="$v_Working_Directory/LAB8-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 00754 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # HE WHO SHALL NOT BE NAMED
-     printf '#!/bin/bash\n\n' >> "$v_Working_Directory/hwsnbn.sh"
-     printf "sed -i 's/Tom Marvolo Riddle/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$v_Working_Directory/hwsnbn.sh"
-     printf "sed -i 's/Lord Voldemort/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$v_Working_Directory/hwsnbn.sh"
-     chown root:root "$v_Working_Directory/hwsnbn.sh"
-     chmod 00700 "$v_Working_Directory/hwsnbn.sh"
-     sed -i '23 i 1  *    * * *   root    /labs/CH08/hwsnbn.sh' /etc/crontab
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-# Frankenstein Letter
-cat > "$v_Working_Directory/frankenstein-letter.txt" << EOF
+              #Answers
+              #15b
+              #awk -F ',' '{$3,$2,$1}' starfleet-ships.txt
+
+              #15c
+              #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V
+
+              #15d
+              #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Constitution-class (31st century)"
+
+              #15e
+              #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Enterprise"
+
+              #15f
+              #awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c
+
+              #15g
+              #tr [:lower:] [:upper:] < starfleet-ships.txt | awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' | sort -V
+
+              #16b
+              #sed -e 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
+
+              #17b
+              #sed -i 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
+
+              #20
+              #fgrep -f written-numbers-search.txt written-numbers.txt
+              ;;
+          -i)
+               info "Setting up the labs for chapter: $l_CH_NUM."
+
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 $l_WORKING_DIRECTORY
+               chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+               # HE WHO SHALL NOT BE NAMED
+               printf '#!/bin/bash\n\n' >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
+               printf "sed -i 's/Tom Marvolo Riddle/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
+               printf "sed -i 's/Lord Voldemort/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
+               chown root:root "$l_WORKING_DIRECTORY/hwsnbn.sh"
+               chmod 00700 "$l_WORKING_DIRECTORY/hwsnbn.sh"
+               sed -i '23 i 1  *    * * *   root    /labs/CH08/hwsnbn.sh' /etc/crontab
+
+# frankenstein letter
+cat > "$l_WORKING_DIRECTORY/frankenstein-letter.txt" << EOF
 To Mrs. Saville, England
 St. Petersburgh, Dec. 11th, 17—
 
@@ -1145,7 +1670,7 @@ R. Walton
 EOF
 
 # lorem-ipsum
-cat > "$v_Working_Directory/lorem-ipsum.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/lorem-ipsum.txt" << EOF
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
 nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
@@ -1161,7 +1686,7 @@ Roman Philosopher, Cicero
 EOF
 
 # numbers
-cat > "$v_Working_Directory/numbers.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/numbers.txt" << EOF
 22
 67
 189
@@ -1185,7 +1710,7 @@ cat > "$v_Working_Directory/numbers.txt" << EOF
 EOF
 
 # starfleet-ships
-cat > "$v_Working_Directory/starfleet-ships.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/starfleet-ships.txt" << EOF
 Danube-class,USS Rubicon,NCC-72936
 unknown,USS Farouk El-Baz,NCC-31823
 Renaissance-class,USS Hornet,NCC-45231
@@ -1467,7 +1992,7 @@ Miranda-class,USS Nautilus,NCC-31910
 EOF
 
 # wizard-names
-cat > "$v_Working_Directory/wizard-names.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/wizard-names.txt" << EOF
 Harry Potter
 Minerva McGonagall
 Albus Dumbledore
@@ -1483,7 +2008,7 @@ Newt Scamander
 EOF
 
 # written-numbers
-cat > "$v_Working_Directory/writen-numbers.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/written-numbers.txt" << EOF
 one
 two
 three
@@ -1497,42 +2022,15 @@ ten
 EOF
 
 # written-numbers-search
-cat > "$v_Working_Directory/writen-numbers-search.txt" << EOF
+cat > "$l_WORKING_DIRECTORY/written-numbers-search.txt" << EOF
 one
 three
 eight
 twenty
 EOF
 
-     #15b (Done In Lab)
-     #awk -F ',' '{$3,$2,$1}' starfleet-ships.txt
-
-     #15c (Done In Lab)
-     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V
-
-     #15d (Done In Lab)
-     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Constitution-class (31st century)"
-
-     #15e (Done In Lab)
-     #awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Enterprise"
-
-     #15f (Done In Lab)
-     #awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c
-
-     #15g (Done In Lab)
-     #tr [:lower:] [:upper:] < starfleet-ships.txt | awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' | sort -V
-
-     #16b (Done In Lab)
-     #sed -e 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
-
-     #17b (Done In Lab)
-     #sed -i 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
-
-     #20 (Done In Lab)
-     #fgrep -f written-numbers-search.txt written-numbers.txt
-
-     # CREATE LAB - SET PERMISSIONS
-cat > "$v_LAB" << EOF
+               # CREATE LAB - SET PERMISSIONS
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:		  LAB08-01
 OBJECTIVE:  The objective of this lab is to learn how to work with files using the commands we learned from the book; we will do so using the files listed below.
 
@@ -1643,48 +2141,121 @@ VIM
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB"
-     chmod 644 "$v_LAB"
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 754 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # CH09 - File Permissions
-function chapter_nine ()
+function chapter_9 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH09"
-     local v_LAB1="$v_Working_Directory/LAB09-01/Constellations/LAB09-01"
-     local v_LAB2="$v_Working_Directory/LAB09-01/Constellations/LAB09-02"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02755 "$v_Working_Directory"
+     # Set the lab number variable, would normally go here, this however, is a two-part, see below.
+     #l_LAB=$(create_lab $l_CH_NUM)
 
-     # LAB09-01
-     mkdir -p "$v_Working_Directory/LAB09-01/Constellations"
-     chown labuser1:labusers1 "$v_Working_Directory/LAB09-01/Constellations"
-     chmod 00744 "$v_Working_Directory/LAB09-01/Constellations"
+     case "$l_OPER" in
+          -c)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no lab to roll forward for lab: $l_LAB."
 
-     # Files
-     touch "$v_Working_Directory/LAB09-01/Constellations/andromeda.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/antlia.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/apus.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/aquila.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/ara.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/aries.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/auriga.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/caelum.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/camelopardalis.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/cancer.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/canes.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/'canis minor'.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/'canis major'.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/capricornus.txt"
-     touch "$v_Working_Directory/LAB09-01/Constellations/cassiopeia.txt"
-     chown labuser1:labusers1 -R "$v_Working_Directory/LAB09-01/Constellations/"
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no lab to roll forward for lab: $l_LAB."
 
-     # CREATE LAB09-01 - SET PERMISSIONS
-cat > "$v_LAB1" << EOF
+               cleanup_and_exit_with_code 1
+               ;;
+          -g)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no grading module available for lab: $l_LAB."
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no grading module available for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+
+               #Answers
+               #3
+               #printf "E=mc2" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+
+               #5
+               #printf "If you can't explain it to a six-year-old, you don't understand it yourself." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+
+               #7
+               #chmod 660 "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+
+               #9
+               #printf "Logic will get you from A to Z; imagination will get you everywhere." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+
+               #12
+               #printf "This must be gravity!" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
+
+               #14
+               #printf "Nature is pleased with simplicity. And nature is no dummy." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
+
+               #16
+               #printf "Any man whose errors take ten years to correct is quite a man." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/oppenheimer.txt"
+
+               #20
+               #printf "People who boast about their I.Q. are losers." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
+               ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02755 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              # Set the lab number variable LAB09-01.
+              l_LAB=$(create_lab $l_CH_NUM)
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+              # LAB09-01 - Constellations
+              mkdir -p "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+              chown labuser1:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+              chmod 00744 "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+
+              # Files
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/andromeda.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/antlia.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/apus.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aquila.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/ara.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aries.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/auriga.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/caelum.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/camelopardalis.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cancer.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/canes.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/'canis minor'.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/'canis major'.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/capricornus.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cassiopeia.txt"
+              chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/"
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB" << EOF
 LAB:        LAB09-01
 OBJECTIVE:  The objective of this lab is to learn how to set UID and GID permissions on files, folders, and sub-folders.
 
@@ -1717,71 +2288,70 @@ STICKY BITS
      a.	What is the group name of the pegasus.txt file?
      b.	Why?
 
-     NOTE:	We only learned about setting group permissions in this lab; you can easily do the same with user permissions. Try it yourself!
+     NOTE: We only learned about setting group permissions in this lab; you can easily do the same with user permissions. Try it yourself!
 
 # Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB1"
-     chmod 644 "$v_LAB1"
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
 
-     # LAB09-02
-     mkdir -p "$v_Working_Directory/LAB09-02/Physicists"
-     chown labuser3:labusers1 "$v_Working_Directory/LAB09-02/Physicists"
-     chmod 00755 "$v_Working_Directory/LAB09-02/Physicists"
+              # Set the lab number variable LAB09-02.
+              l_LAB=$(create_lab $l_CH_NUM 2)
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-     # CREATE FILES
-     touch "$v_Working_Directory/LAB09-02/Physicists/archimedes.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/bohr.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/cox.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/curie.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
-     #printf "E=mc2" >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
-     #printf "If you can't explain it to a six-year-old, you don't understand it yourself." >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
-     #printf "Logic will get you from A to Z; imagination will get you everywhere." >> "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/faraday.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/feynman.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/galilei.txt"
-     printf "Intelligence is the ability to adapt to change." >> "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
-     #printf "People who boast about their I.Q. are losers." >> "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/kaku.txt"
-     printf "Falling Apple" >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
-     #printf "This must be gravity!" >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
-     #printf "Nature is pleased with simplicity. And nature is no dummy." >> "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
-     printf "Now, I have become Death, the destroyer of worlds." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
-     #printf "Any man whose errors take ten years to correct is quite a man." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/pascal.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/raman.txt"
-     touch "$v_Working_Directory/LAB09-02/Physicists/tesla.txt"
+              # LAB09-02 - Physicists
+              mkdir -p "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
+              chown labuser3:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
+              chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
 
-     # Create script to list all .txt files without extension.
-     printf '#!/bin/bash\n' >> "$v_Working_Directory/LAB09-02/Physicists/physicists-list"
-     printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$v_Working_Directory/LAB09-02/Physicists/physicists-list"
+              # CREATE FILES
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/archimedes.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/bohr.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/cox.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/curie.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
 
-     # SET PERMISSIONS FOR FILES
-     chmod 00660 -R "$v_Working_Directory/LAB09-02/Physicists/"
-     chmod 00750 "$v_Working_Directory/LAB09-02/Physicists/"
-     chown labuser3:labusers1 -R "$v_Working_Directory/LAB09-02/Physicists/"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/faraday.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/feynman.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/galilei.txt"
+              printf "Intelligence is the ability to adapt to change." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
 
-     # Einstein is editable by labuser3 then labuser2 after security change.
-     chmod 640 "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
-     # (Done In Lab)
-     #chmod 660 "$v_Working_Directory/LAB09-02/Physicists/einstein.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/kaku.txt"
+              printf "Falling Apple" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
 
-     # Newton is editable by labuser3 and labuser2
-     chown labuser2:labusers1 "$v_Working_Directory/LAB09-02/Physicists/newton.txt"
+              printf "Now, I have become Death, the destroyer of worlds." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
 
-     # Hawking is only editable by labuser2
-     chmod 00600 "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
-     chown labuser2:labusers1 "$v_Working_Directory/LAB09-02/Physicists/hawking.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/pascal.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/raman.txt"
+              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/tesla.txt"
 
-     # Oppenheimer is editable by labuser3 and labuser2
-     chown labuser2:labusers2 "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
-     #printf "Now, I have become Death, the destroyer of worlds." >> "$v_Working_Directory/LAB09-02/Physicists/oppenheimer.txt"
+              # Create script to list all .txt files without extension.
+              printf '#!/bin/bash\n' >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
+              printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
 
-     # CREATE LAB09-02 - SET PERMISSIONS
-cat > "$v_LAB2" << EOF
+              # SET PERMISSIONS FOR FILES
+              chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
+              chmod 00750 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
+              chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
+
+              # Einstein is editable by labuser3 then labuser2 after security change.
+              chmod 640 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
+
+              # Newton is editable by labuser3 and labuser2
+              chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
+
+              # Hawking is only editable by labuser2
+              chmod 00600 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
+              chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
+
+              # Oppenheimer is editable by labuser3 and labuser2
+              chown labuser2:labusers2 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
+
+              # CREATE LAB09-02 - SET PERMISSIONS
+cat > "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB" << EOF
 LAB:	       LAB09-02
 OBJECTIVE:  The objective of this lab is to learn how to set file permissions.
 
@@ -1789,143 +2359,222 @@ OBJECTIVE:  The objective of this lab is to learn how to set file permissions.
 * You will switch to the labuser2 account using the password of ‘P@$$w0rd’
 * To complete this lab, you must be in the CH09/LAB09-02 folder.
 
-1.	Change into the 'Physicists' folder.
+1.  Change into the 'Physicists' folder.
 
 EINSTEIN
-2.	Using the groups command, list the groups for labuser1, labuser2, and labuser3.
-3.	Using the vim text editor, open the einstein.txt text file and place the following line of text in that file: "E=mc2" and exit from vim.
-4.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
-5.	Using the vim text editor, open the einstein.txt text file and add the following text under the previous line: "If you can't explain it to a six-year-old, you don't understand it yourself," and exit from vim.
-     a.	Were you able to add the text?
-     b.	Why?
-6.	Exit from the labuser2 account.
-7.	Change the permissions on the einstein.txt file granting labuser2 rw permissions; no other permissions should be set.
-8.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
-9.	Using the vim text editor, open the einstein.txt text file and add the following line of text under the previous line: "Logic will get you from A to Z; imagination will get you everywhere," and exit from vim.
-     a.	Were you able to add the text?
-     b.	If not, then why?
-10.	Exit from the labuser2 account.
+2.  Using the groups command, list the groups for labuser1, labuser2, and labuser3.
+3.  Using the vim text editor, open the einstein.txt text file and place the following line of text in that file: "E=mc2" and exit from vim.
+4.  Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+5.  Using the vim text editor, open the einstein.txt text file and add the following text under the previous line: "If you can't explain it to a six-year-old, you don't understand it yourself," and exit from vim.
+    a.	Were you able to add the text?
+    b.	Why?
+6.  Exit from the labuser2 account.
+7.  Change the permissions on the einstein.txt file granting labusers1 group rw permissions; no other permissions should be set.
+8.  Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+9.  Using the vim text editor, open the einstein.txt text file and add the following line of text under the previous line: "Logic will get you from A to Z; imagination will get you everywhere," and exit from vim.
+    a.	Were you able to add the text?
+    b.	If not, then why?
+10. Exit from the labuser2 account.
 
 FILES OWNED BY LABUSER2
-11.	Find the physicists whose files are owned by labuser2.
-     a.	How many are there?
-     b.	Who are they?
+11. Find the physicists whose files are owned by labuser2.
+    a.	How many are there?
+    b.	Who are they?
  
 NEWTON
-12.	Using the vim text editor, open the newton.txt text file and add the following line of text under the existing line: "This must be gravity!" and exit from vim.
-     a.	Were you able to add the text?
-     b.	If so, then why?
-13.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
-14.	Using the vim text editor, open the newton.txt and add the following text to that file: "Nature is pleased with simplicity. And nature is no dummy," and exit from vim.
-     a.	Were you able to add the text?
-     b.	If so, then why?
-15.	Exit from the labuser2 account.
+12. Using the vim text editor, open the newton.txt text file and add the following line of text under the existing line: "This must be gravity!" and exit from vim.
+    a.	Were you able to add the text?
+    b.	If so, then why?
+13. Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+14. Using the vim text editor, open the newton.txt and add the following text to that file: "Nature is pleased with simplicity. And nature is no dummy," and exit from vim.
+    a.	Were you able to add the text?
+    b.	If so, then why?
+15. Exit from the labuser2 account.
 
 REMAINING FILES
-16.	Using the vim text editor, open the remaining two files owned by labuser2. In the file, you can edit and add the text under the existing line: "Any man whose errors take ten years to correct is quite a man," and exit from vim.
-     a.	Which file were you able to edit?
-17.	Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
-18.	Add only the permissions needed for labuser3 to edit and save the file that could not be edited in the previous step.
-19.	Exit from the labuser2 account.
-20.	Using the vim text editor, open the remaining unedited files owned by labuser2.  Add the following text under the existing line: "People who boast about their I.Q. are losers," and exit from vim.
-     a.	Were you able to update the file this time?
-     b.	Why?
+16. Using the vim text editor, open the remaining two files owned by labuser2. In the file, you can edit and add the text under the existing line: "Any man whose errors take ten years to correct is quite a man," and exit from vim.
+    a.	Which file were you able to edit?
+17. Using the su command, switch to the labuser2 account and navigate to the Physicists folder.
+18. Add only the permissions needed for labuser3 to edit and save the file that could not be edited in the previous step.
+19. Exit from the labuser2 account.
+20. Using the vim text editor, open the remaining unedited files owned by labuser2.  Add the following text under the existing line: "People who boast about their I.Q. are losers," and exit from vim.
+    a.	Were you able to update the file this time?
+    b.	Why?
 
 LISTING GROUPS
-21.	Type the following command: "id -nG labuser3"
-     a.	What groups is labuser3 a member of?
-22.	Type the following command: "id -nG labuser2"
-     a.	What groups is labuser2 a member of?
+21. Type the following command: "id -nG labuser3"
+    a.	What groups is labuser3 a member of?
+22. Type the following command: "id -nG labuser2"
+    a.	What groups is labuser2 a member of?
  
 EXECUTABLE FLIES
-23.	Type the following command: "cat physicists-list"
-     a.	What does it look like this file does?
-24.	Type the following command: “./physicists-list”
-     a.	What happened?
-25.	Add the execute permission to the user and group of the physicists-list file. Then Type the following command: “./physicists-list” again.
-     a.	What happened?
+23. Type the following command: "cat physicists-list"
+    a.	What does it look like this file does?
+24. Type the following command: “./physicists-list”
+    a.	What happened?
+25. Add the execute permission to the user and group of the physicists-list file. Then Type the following command: “./physicists-list” again.
+    a.	What happened?
 
 # Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB2"
-     chmod 644 "$v_LAB2"
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
+              ;;
+          -r)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is nothing to reset for lab: $l_LAB."
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is nothing to reset for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+               ;;
+     esac
 }
 
 #CH10 - SELinux and AppArmor (No Labs)
-function chapter_ten ()
+function chapter_10 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH10"
-     local v_LAB="$v_Working_Directory/LAB10-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH11 - File Compression and Storage
-function chapter_eleven ()
+function chapter_11 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH11"
-     local v_LAB="$v_Working_Directory/LAB11-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
-     #chown labuser1:labusers1 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # CREATE THE ZOO
-     mkdir "$v_Working_Directory/Pittsburgh Zoo"
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-     touch "$v_Working_Directory/Pittsburgh Zoo/Aardvark"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Anteater"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Beaver"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Camel"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Donkey"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Eland"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Giraffe"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Grizzly Bear"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Kangaroo"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Lemur"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Red Panda"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Sloth"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Tiger"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Wolf"
-     touch "$v_Working_Directory/Pittsburgh Zoo/Zebra"
+              #Answers
+              #1
+              # tar -lf pghzoo.tar.gz
 
-     cd "$v_Working_Directory"
-     tar -czf pghzoo.tar.gz "Pittsburgh Zoo" 2>/dev/null
-     rm -r "$v_Working_Directory/Pittsburgh Zoo/"
+              #2
+              # tar -xvf pghzoo.tar.gz
 
-     #1 (Done In Lab)
-     # tar -lf pghzoo.tar.gz
+              #4
+              # rm pghzoo.tar.gz
 
-     #2 (Done In Lab)
-     # tar -xvf pghzoo.tar.gz
+              #5
+              # cd "Pittsburgh Zoo"
+              # touch Lion
+              # touch "Black Bear"
+              # touch Chimpanzee
 
-     #4 (Done In Lab)
-     # rm pghzoo.tar.gz
+              #6
+              # tar -czvf pghzoo.tar.gz "Pittsburgh Zoo"
 
-     #5 (Done In Lab)
-     # cd "Pittsburgh Zoo"
-     # touch Lion
-     # touch "Black Bear"
-     # touch Chimpanzee
+              #7
+              # zip -r pghzoo.zip "Pittsburgh Zoo"/
+              # unzip -l pghzoo.zip
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
 
-     #6 (Done In Lab)
-     # tar -czvf pghzoo.tar.gz "Pittsburgh Zoo"
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-     #7 (Done In Lab)
-     # zip -r pghzoo.zip "Pittsburgh Zoo"/
-     # unzip -l pghzoo.zip
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown labuser1:labusers1 $l_WORKING_DIRECTORY
+              chmod 02775 "$l_WORKING_DIRECTORY"
 
-     # CREATE LAB - SET PERMISSIONS
-cat > "$v_LAB" << EOF
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+              # CREATE THE ZOO
+              mkdir "$l_WORKING_DIRECTORY/Pittsburgh Zoo"
+
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Aardvark"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Anteater"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Beaver"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Camel"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Donkey"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Eland"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Giraffe"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Grizzly Bear"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Kangaroo"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Lemur"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Red Panda"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Sloth"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Tiger"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Wolf"
+              touch "$l_WORKING_DIRECTORY/Pittsburgh Zoo/Zebra"
+
+              cd "$l_WORKING_DIRECTORY"
+              tar -czf pghzoo.tar.gz "Pittsburgh Zoo" 2>/dev/null
+              rm -r "$l_WORKING_DIRECTORY/Pittsburgh Zoo/"
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB11-01
 OBJECTIVE:  The objective of this lab is to learn how to work with file compression and storage.
 
@@ -1933,712 +2582,1723 @@ OBJECTIVE:  The objective of this lab is to learn how to work with file compress
 * To complete this lab, you must be in the CH11 folder.
 
 UNCOMPRESS ARCHIVE
-1.	Using the tar command, list the contents of the pghzoo.tar.gz archive.
-     a.	What did you notice?
-     b.	What options did you use?
-2.	Using the tar command, uncompress the pghzoo.tar.gz archive verbosely.
-     a.	What did you notice?
-3.	List the contents of the CH11/Pittsburgh Zoo folder.
-     a.	Who is the owner of the files, and what are the permissions?
-     b.	What are the permissions of the CH11 folder?
-4.	Remove the pghzoo.tar.gz archive file.
-5.	Go into the Pittsburgh Zoo folder.
-     a.	Using the touch command, create a file called 'Lion'
-     b.	Using the touch command, create a file called 'Black Bear'
-     c.	Using the touch command, create a file called 'Chimpanzee'
-     d.	Change from the Pittsburgh Zoo folder.
+1.  Using the tar command, list the contents of the pghzoo.tar.gz archive.
+    a.	What did you notice?
+    b.	What options did you use?
+2.  Using the tar command, uncompress the pghzoo.tar.gz archive verbosely.
+    a.	What did you notice?
+3.  List the contents of the CH11/Pittsburgh Zoo folder.
+    a.	Who is the owner of the files, and what are the permissions?
+    b.	What are the permissions of the CH11 folder?
+4.  Remove the pghzoo.tar.gz archive file.
+5.  Go into the Pittsburgh Zoo folder.
+    a.	Using the touch command, create a file called 'Lion'
+    b.	Using the touch command, create a file called 'Black Bear'
+    c.	Using the touch command, create a file called 'Chimpanzee'
+    d.	Change from the Pittsburgh Zoo folder.
 
 CREATE A TARBALL
-6.	From the CH11 folder, create a new archive of the Pittsburgh Zoo folder, use the verbose switch and ensure that you gzip the file. Use the same filename as before pghzoo.tar.gz
-     a.	Ensure the new archive has all of the new files.
-     b.	Remove the Pittsburgh Zoo folder.
-     c.	Restore your archive.
-     d.	Are the three new file you created in the Pittsburgh Zoo folder?
+6.  From the CH11 folder, create a new archive of the Pittsburgh Zoo folder, use the verbose switch and ensure that you gzip the file. Use the same filename as before pghzoo.tar.gz
+    a.	Ensure the new archive has all of the new files.
+    b.	Remove the Pittsburgh Zoo folder.
+    c.	Restore your archive.
+    d.	Are the three new file you created in the Pittsburgh Zoo folder?
 
 COMPRESS A DIRECTORY AND FILES
-7.	From the CH11 folder, create a compressed file containing the Pittsburgh Zoo folder. Use pghzoo.zip as the filename.
-     a.	What do you notice?
-     b.	Use the "unzip" command to list the contents of the 'pghzoo.zip' archive.
+7.  From the CH11 folder, create a compressed file containing the Pittsburgh Zoo folder. Use pghzoo.zip as the filename.
+    a.	What do you notice?
+    b.	Use the "unzip" command to list the contents of the 'pghzoo.zip' archive.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
+}
+
+#CH12 - User and Group Management - TODO: TEST
+function chapter_12 ()
+{
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
+
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
+
+     # Set the lab number variable, would normally go here, this however, is a two-part, see below.
+     #l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no lab to roll forward for lab: $l_LAB."
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no lab to roll forward for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+               ;;
+          -g)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no grading module available for lab: $l_LAB."
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no grading module available for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+
+               #ANSWERS LAB12-01
+               #3
+               # a, b, e, f
+               #useradd -m -d /home/labuser4 -c "Lab User 4" -s /bin/false labuser4
+               # c
+               #usermod -g labusers1 labuser4
+               # d
+               #usermod -a -G sudo labuser4
+               # g
+               #echo 'labuser4:P@$$w0rd' | chpasswd
+
+               #4
+               #usermod -s /bin/bash labuser4
+
+               #7
+               #printf "This is a private system used for the Linux System Administration CIT-220 class." >> /etc/motd
+
+               #10
+               # groupadd labuser4
+               #usermod -a -G finance labuser1
+               #usermod -a -G finance labuser2
+               #usermod -a -G finance labuser4
+
+               #11
+               #mkdir finance
+               #chown labuser4:finance finance
+               #chmod 02770 finance
+
+               #12
+               #touch budget
+               #chown labuser4:labusers1 budget
+
+               #touch accounts-payable
+               #chown labuser2:labusers1 accounts-payable
+               #printf "$23,565" >> budget
+
+               #15
+               #echo 'labuser4:pAsswOrd' | chpasswd
+               #echo 'labuser4:P@$$w0rd' | chpasswd
+
+               #ANSWERS LAB12-02
+               #1
+               # a, b, d, f
+               #useradd -m -d /home/labuser4 -c "Lab User 5" -s /bin/bash labuser5
+               # c
+               #groupadd labusers5
+               #usermod -g labusers5 labuser5
+               # d
+               #usermod -a -G labusers1 labuser5
+               # g
+               #echo 'labuser5:P@$$w0rd' | chpasswd
+
+               #2
+               #quotacheck -avugc
+
+               #3
+               #edquota -u labuser5
+
+               #4
+               #for i in {1..10}; do echo "IIIIIIIIIIIIIIIIIIII" >> file.labuser5; done
+
+               #5
+               #quota labuser5
+
+               #6
+               #quotaon "/Lab Files/CH12/LAB12-02/"
+
+               #7
+               #quota
+               #cp /etc/* "/Lab Files/CH12/LAB12-02"
+              ;;
+          -i)
+               info "Setting up the labs for chapter: $l_CH_NUM."
+
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 $l_WORKING_DIRECTORY
+               chmod 02775 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               # Set the lab number variable LAB12-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB12-01
+OBJECTIVE:  The objective of this lab is to learn how to work with users and groups.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* You should be logged in as labuser2 with the password of ‘P@$$w0rd’
+* You should be logged in as labuser3 with the password of ‘P@$$w0rd’
+* You will create a labuser4 account.
+* To complete this lab, you must be in the CH12 folder.
+
+LEARNING ABOUT USERS
+1.  Using the getent command, interrogate the passwd database for labuser1.
+    a.	What did you notice?
+2.  Using the getent command, interrogate the passwd database for labuser2 and labuser3.
+    a.	What did you notice?
+    b.	What was different about each of these accounts?
+3.  Create a new user:
+    a.	The username must be labuser4.
+    b.	Set the real name to Lab User 4.
+    c.	The users primary group must be labusers1.
+    d.	The user must be a member of the sudo group.
+    e.	Set the login shell to /bin/false.
+    f.	The user must have a home directory set to /home/labuser4
+    g.	Set the password to P@$$w0rd.
+
+    NOTE: You will have to use the sudo command for these steps.
+
+4.  Using the su command, switch to the labuser4 account.
+    a.	What happened and why?
+5.  Update the labuser4 shell from /bin/false to /bin/bash.
+6.  Using the su command, switch to the labuser4 account.
+    a.	What happened and why?
+
+LOGIN MESSAGE
+7.  Using the vim editor, create an /etc/motd file. Place the following line of text in that file: "This is a private system used for the Linux System Administration CIT-220 class."
+    a.	Write and exit that file.
+
+     NOTE: You will have to use the sudo command for this step.
+
+8.  Log out of the labuser1 account.
+9.  Log in to the labuser1 account
+    a.	What did you notice?
+ 
+LEARNING ABOUT GROUPS
+10. Create a new group:
+    a.	Name the group "finance"
+    b.	Add users labuser1, labuser2, and labuser4 to this group.
+
+11. In the CH12 folder, create a directory called “finance”.
+    a.	Change the ownership of the finance directory with labuser4 as the owner and finance as the group.
+    b.	Change the permissions of the finance folder to 770
+
+     NOTE: You will have to use the sudo command for this step.
+
+12. Using the su command, switch to the labuser4 account.
+    a.	Create a file called budget in the finance folder.
+    b.	What permissions does this file have?
+    c.	Who is the owner of the budget file?
+    d.	Exit from the labuser4 account.
+
+13. Using the su command, switch to the labuser2 account.
+    a.	Create a file called accounts-payable in the finance folder.
+    b.	What permissions does this file have?
+    c.	Who is the owner of the budget file?
+    d.	Add $23,565 to the budget file using the vim editor and exit from vim.
+    e.	Why were you able to modify this file?
+    f.   Exit from the labuser2 account.
+
+14. Using the su command, switch to the labuser3 account.
+    a.	Change to the finance folder.
+    b.	Why could you not change into the folder?
+    c.   Exit from the labuser3 account.
+
+CHANGING PASSWORDS
+15. Change the password of labuser4 to pAsswOrd.
+
+16. Using the su command, switch to the labuser4 account.
+    a.	Did the new password work?
+    b.	From the labuser4 account, change the password back to P@$$w0rd.
+    c.	Exit from the labuser4 account.
+
+PASSWORD AGE
+17. List the password ages for labuser1, labuser2, labuser3 and labuser4.
+    a.	What do you notice?
+ 
+WHO ARE YOU?
+18. Using the whoami command, discover who you are.
+19. Using the w command, discover whom you're logged in as.
+20. Using the su command, switch to the labuser4 account.
+    a.	Use the "w" command.
+    b.	What do you see?
+EOF
+
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+
+               # CREATE LAB - SET PERMISSIONS
+               # Set the lab number variable LAB12-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+               #Setup Quota Disk
+               wipefs /dev/sdb --all --force --quiet
+               sgdisk -g /dev/sdb >> /dev/nul
+               sgdisk -n 1:0:524254 -t 1:8300 /dev/sdb >> /dev/nul
+               mkfs.ext4 /dev/sdb1 >> /dev/null 2>&1
+
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB"
+               cp /etc/fstab{,.bak}
+               printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
+               mount /labs/CH12/LAB12-02
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB12-02
+OBJECTIVE:  The objective of this lab is to learn how to work with and set disk storage quotas.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* You will create a labuser5 account.
+* To complete this lab, you must be in the CH12 folder.
+* Devices used: /dev/sdb
+  NOTE: This volume is setup and ready to use.
+
+
+QUOTAS
+1.  Create a new user:
+    a.	The username must be labuser5.
+    b.	Set the real name to Lab User 5.
+    c.	The users primary group must be labusers5.
+    d.	The user should be a member of the labusers1 group.
+    e.	Set the login shell to /bin/bash.
+    f.	The user must have a home directory set to /home/labuser5
+    g.	Set the password to P@$$w0rd.
+2.  Using the quotacheck command, update the quota volume mounted at: /Lab Files/CH12/LAB12-02
+3.  Using the edquota command, edit the quota for the labuser5 user, setting the quota as shown below, then exit edquota.
+    Filesystem                   blocks       soft       hard     inodes     soft     hard
+    /dev/sdb1                         0         50        100          0        0        0
+4.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02 folder.
+    a.	Using the vim editor, create a new file called file.labuser5, inside of that file place ten (10) lines of any single CAPITAL letter. Each line should be twenty (20) characters wide.
+    b.	Exit from the labuser5 account.
+5.  Using the quota command, check the quota for labuser5.
+    a.	What do you see?
+    6.	Turn the quota system on for /Lab Files/CH12/LAB12-02.
+7.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02 folder.
+    a.	Type quota and view the output.
+    b.	Using the cp command, copy all of the /etc folder into the /Lab Files/CH12/LAB12-02 folder.
+    c.	What happened?
+    d.	Exit from the labuser5 account.
 
 # Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
 # Dr. Matthew Kisow
 EOF
 
-     chown root:labusers1 "$v_LAB"
-     chmod 644 "$v_LAB"
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
+          -r)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is nothing to reset for lab: $l_LAB."
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is nothing to reset for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+               ;;
+     esac
 }
 
-#CH12 - User and Group Management - TODO: LAB12-02
-function chapter_twelve ()
+#CH13 - Account Security (No Labs) - TODO: LAB13-01 (ssh) pg. 364-365
+function chapter_13 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH12"
-     local v_LAB1="$v_Working_Directory/LAB12-01"
-     local v_LAB2="$v_Working_Directory/LAB12-02"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
-     #chown labuser1:labusers1 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # CREATE LAB12-1 - SET PERMISSIONS
-cat > "$v_LAB1" << EOF
-LAB:	       LAB12-01
-OBJECTIVE:  The objective of this lab is to learn how to work with users and groups.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
 
-* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
-* To complete this lab, you must be in the CH12 folder.
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-LEARNING ABOUT USERS
-1.	Using the getent command, interrogate the passwd database for labuser1.
-     a.	What did you notice?
-2.	Using the getent command, interrogate the passwd database for labuser2 and labuser3.
-     a.	What did you notice?
-     b.	What was different about each of these accounts?
-3.	Create a new user:
-     a.	The username must be labuser4.
-     b.	Set the real name to Lab User 4.
-     c.	The users primary group must be labusers1.
-     d.	The user must be a member of the sudo group.
-     e.	Set the login shell to /bin/false.
-     f.	The user must have a home directory set to /home/labuser4
-     g.	Set the password to P@$$w0rd.
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
 
-NOTE: You will have to use the sudo command for these steps.
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-4.	Using the su command, switch to the labuser4 account.
-     a.	What happened and why?
-5.	Update the labuser4 shell from /bin/false to /bin/bash.
-6.	Using the su command, switch to the labuser4 account.
-     a.	What happened and why?
-
-LOGIN MESSAGE
-7.	Using the vim editor, create an /etc/motd file. Place the following line of text in that file: "This is a private system used for the Linux System Administration CIT-220 class."
-     a.	Write and exit that file.
-
-     NOTE: You will have to use the sudo command for this step.
-
-8.	Log out of the labuser1 account.
-9.	Log in to the labuser1 account
-     a.	What did you notice?
- 
-LEARNING ABOUT GROUPS
-10.	Create a new group:
-     a.	Name the group "finance"
-     b.	Add users labuser1, labuser2, and labuser4 to this group.
-
-11.	In the CH12 folder, create a directory called “finance”.
-     a.	Change the ownership of the finance directory with labuser4 as the owner and finance as the group.
-     b.	Change the permissions of the finance folder to 770
-
-     NOTE: You will have to use the sudo command for this step.
-
-12.	Using the su command, switch to the labuser4 account.
-     a.	Create a file called budget in the finance folder.
-     b.	What permissions does this file have?
-     c.	Who is the owner of the budget file?
-     d.	Exit from the labuser4 account.
-
-13.	Using the su command, switch to the labuser2 account.
-     a.	Create a file called accounts-payable in the finance folder.
-     b.	What permissions does this file have?
-     c.	Who is the owner of the budget file?
-     d.	Add $23,565 to the budget file using the vim editor and exit from vim.
-     e.	Why were you able to modify this file?
-     f.   Exit from the labuser2 account.
-
-14.	Using the su command, switch to the labuser3 account.
-     a.	Change to the finance folder.
-     b.	Why could you not change into the folder?
-     c.   Exit from the labuser3 account.
-
-CHANGING PASSWORDS
-15.	Change the password of labuser4 to pAsswOrd.
-
-16.	Using the su command, switch to the labuser4 account.
-     a.	Did the new password work?
-     b.	From the labuser4 account, change the password back to P@$$w0rd.
-     c.	Exit from the labuser4 account.
-
-PASSWORD AGE
-17.	List the password ages for labuser1, labuser2, labuser3 and labuser4.
-     a.	What do you notice?
- 
-WHO ARE YOU?
-18.	Using the whoami command, discover who you are.
-19.	Using the w command, discover whom you're logged in as.
-20.	Using the su command, switch to the labuser4 account.
-     a.	Use the "w" command.
-     b.	What do you see?
-EOF
-
-     #ANSWERS
-     #3
-     # a, b, e, f
-     #useradd -m -d /home/labuser4 -c "Lab User 4" -s /bin/false labuser4
-     # c
-     #usermod -g labusers1 labuser4
-     # d
-     #usermod -a -G sudo labuser4
-     # g
-     #echo 'labuser4:P@$$w0rd' | chpasswd
-
-     #4
-     #usermod -s /bin/bash labuser4
-
-     #7
-     #printf "This is a private system used for the Linux System Administration CIT-220 class." >> /etc/motd
-
-     #10
-     # groupadd labuser4
-     #usermod -a -G finance labuser1
-     #usermod -a -G finance labuser2
-     #usermod -a -G finance labuser4
-
-     #11
-     #mkdir finance
-     #chown labuser4:finance finance
-     #chmod 02770 finance
-
-     #12
-     #touch budget
-     #chown labuser4:labusers1 budget
-
-     #touch accounts-payable
-     #chown labuser2:labusers1 accounts-payable
-     #printf "$23,565" >> budget
-
-     #15
-     #echo 'labuser4:pAsswOrd' | chpasswd
-     #echo 'labuser4:P@$$w0rd' | chpasswd
-
-     # CREATE LAB12-02 - SET PERMISSIONS
-     #Setup Quota Disk
-     wipefs /dev/sdb --all --force --quiet
-     sgdisk -g /dev/sdb >> /dev/nul
-     sgdisk -n 1:0:524254 -t 1:8300 /dev/sdb >> /dev/nul
-     mkfs.ext4 /dev/sdb1 >> /dev/null 2>&1
-
-     mkdir "$v_Working_Directory/LAB12-02"
-     printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
-     mount /labs/CH12/LAB12-02
-
-cat > "$v_LAB2" << EOF
-TODO: pg. 344 at Step 6
-EOF
-
-     chown root:labusers1 "$v_LAB2"
-     chmod 02770 "$v_LAB2"
-}
-
-#CH13 - Account Security (No Labs)
-function chapter_thirteen ()
-{
-     local v_Working_Directory="$g_LAB_PATH/CH13"
-     local v_LAB="$v_Working_Directory/LAB13-01"
-
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
-
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
-
-     #Setup ssh
-     #pg. 364-365
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH14 - Logging Services (No Labs)
-function chapter_fourteen ()
+function chapter_14 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH14"
-     local v_LAB="$v_Working_Directory/LAB14-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH15 - Linux Devices (No Labs)
-function chapter_fifteen ()
+function chapter_15 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH15"
-     local v_LAB="$v_Working_Directory/LAB15-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
-#CH16 - Hardware Troubleshooting - NOT DONE
-function chapter_sixteen ()
+#CH16 - Hardware Troubleshooting
+function chapter_16 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH16"
-     local v_LAB="$v_Working_Directory/LAB16-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #uptime
-     #cat /proc/cpuinfo
-     #iostat -c
-     #free
-     #vmstat
-     #swapon -s
-     #cat /proc/ioports
-     #lspci
-     #lsusb
-     #lsdev
-     #dmidecode
-     #lshw
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+
+              #ANSWERS
+              #1
+              #uptime
+
+              #2
+              #cat /proc/cpuinfo
+
+              #3
+              #iostat -c
+
+              #4
+              #free
+
+              #5
+              #vmstat
+
+              #6
+              #swapon -s
+
+              #7
+              #cat /proc/ioports
+
+              #8
+              #lspci
+
+              #9
+              #lsusb
+
+              #10
+              #lsdev
+
+              #11
+              #dmidecode
+
+              #12
+              #lshw
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02744 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB16-01
+OBJECTIVE:  The objective of this lab is to learn how to troubleshoot hardware.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH16 folder.
+
+TROUBLESHOOTING HARDWARE
+1.  Discover how long your server has been running.
+2.  Using the cat command, list the contents of the processor.
+    a.	What did you notice?
+3.  What are the current CPU utilization statistics?
+4.  Discover how much free memory is available.
+5.  Get a detailed usage of your memory.
+6.  List the currently active memory page file.
+    a.	Is it an actual file or a partition?
+
+PHYSICAL DEVICES
+7.  List all communication ports open to the processor.
+    a.	What command did you use?
+8.  List all of the PCI devices.
+9.  List all of the USB devices.
+10.  List all of the devices.
+11.  Decode the DMI devices.
+12.
+
+
+
+
+List all of the hardware.
+
+13.	In 200 words, describe what each of the commands under the physical devices section does and how they relate to each other. Cite at least two outside resources using APA.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+
+EOF
+
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH17 - Kernel Modules (No Labs)
-function chapter_seventeen ()
+function chapter_17 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH17"
-     local v_LAB="$v_Working_Directory/LAB17-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #TODO: Future
-     #lsmod
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH18 - Storage Concepts
-function chapter_eighteen ()
+function chapter_18 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH18"
-     local v_LAB="$v_Working_Directory/LAB18-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #1. Using the "lsblk" command, locate and identify disk /dev/sdc.
-     #2. Using the "fdisk" command, edit the partition table on /dev/sdc.
-     #   a. Create a new gpt partition (g) on /dev/sdc.
-     #   b. Create a new partition (n) on /dev/sdc.
-     #   c. List the new partition (p) on /dev/sdc.
-     #   d. Write the partition table (w) on /dev/sdc.
-     #3. Using the "lsblk" command, locate and identify disk /dev/sdc1.
-     #4. Using the "mkfs.ext4" command, create a new filesystem on the /dev/sdc1
-     #   disk.
-     #5. Using the vim editor, update the /etc/fstab.
-     #   a. Create a new folder called "LAB18-01" in the /labs/CH18 folder.
-     #6. Mount the disk:
-     #   a. Set /dev/sdc1 to mount at /labs/CH18/LAB18-01.
-     #7. Set the volume ownership and permissions:
-     #   a. Change the ownership of the "LABS18-01" folder to labuser1:labusers1.
-     #   b. Set the permissions of the "LABS18-01" folder to 02770.
-     #8. Change to the labuser2 account.
-     #   a. Create a folder called "Pets: in the LABS18-01 folder.
-     #   b. Create two files in the "Pets" folder, one called "Dogs" and another
-     #      called "Cats".
-     #   c. Exit from the labuser2 account.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02775 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	LAB18-01
+OBJECTIVE: 	The objective of this lab is to learn how to set up and install a new disk.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH16 folder.
+* Devices used: /dev/sdc
+
+1.  Using the lsblk command, locate and identify disk /dev/sdc.
+2.  Using the fdisk command, edit the partition table on /dev/sdc.
+    a.	Create a new gpt partition (g) on /dev/sdc.
+    b.	Create a new partition (n) on /dev/sdc.
+    c.	List the new partition (p) on /dev/sdc.
+    d.	Write the partition table (w) on /dev/sdc.
+3.  Using the lsblk command, locate and identify disk /dev/sdc1.
+4.  Using the mkfs.ext4 command, create a new filesystem on the /dev/sdc1 disk.
+5.  Create a new folder called LAB18-01 in the /labs/CH18 folder.
+6.  Using the vim editor, update the /etc/fstab file mounting this new device to the directory you created in the first step.
+    a.	Set /dev/sdc1 to mount at /labs/CH18/LAB18-01.
+7.  Mount the newly created device.
+8.  Set the volume ownership and permissions:
+    a.	Change the ownership of the LABS18-01 folder to labuser1:labusers1.
+    b.	Set the permissions of the LABS18-01 folder to 02770.
+9.  Change to the labuser2 account.
+    a.	Create a folder called pets in the LABS18-01 folder.
+    b.	Create two files in the pets folder; one called “Dogs” and another called “Cats.”
+    c.	Exit from the labuser2 account.
+
+    NOTE:	To show me you did this correctly, attach an additional screenshot to your lab report showing the output from the df -h command.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
-#CH19 - Storage Configuration - NOT DONE
-function chapter_nineteen ()
+#CH19 - Storage Configuration
+function chapter_19 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH19"
-     local v_LAB1="$v_Working_Directory/LAB19-01"
-     local v_LAB2="$v_Working_Directory/LAB19-02"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable, would normally go here, this however, is a two-part, see below.
+     #l_LAB=$(create_lab $l_CH_NUM)
 
-     #1.  Using the "lsblk" command, locate the two 128Mb disks.
-     #2.  Using the "pvcreate" command, take the first disk /dev/sdd and create
-     #    a physical volume on this disk.
-     #3.  Using the "pvdisplay" command, verify the previous command.
-     #4.  Using the "vgcreate" command, create a volume group called "vg1" on
-     #    /dev/sdd
-     #5.  Using the "vgdisplay" command, verify the previous command.
-     #6.  Using the "lvcreate" command, create a 124Mb logical volume on "vg1"
-     #    with the name "CIT220"
-     #7.  Force those changes using the "vgchange --available y" command.
-     #8.  Make an ext4 filesystem on the new logical volume at /dev/vg1/CIT220,
-     #    do not reserve blocks and apply the label CIT220 to the volume.
+     case "$l_OPER" in
+          -c)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no lab to roll forward for lab: $l_LAB."
 
-     #    NOTE: The following warning is normal for previously written to disks,
-     #          choose "y" to continue.
-     #          "WARNING: ext4 signature detected on /dev/vg1/CIT220 at offset
-     #           1080. Wipe it? [y/n]:"
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no lab to roll forward for lab: $l_LAB."
 
-     #9.  Mount the new logical volume:
-     #    a. Make a new folder called "LAB19-01" under the folder "/labs/CH19"
-     #    b. Update the filesystem table and mount the new volume at
-     #       /labs/CH19/LAB19-01.
-     #    c. Using the "mount" command, mount the filesystem.
-     #10. Using the "pvcreate" command, take the second disk /dev/sde and create
-     #    a physical volume on this disk.
-     #11. Using the "vgdisplay" command, list the volume group vg1.
-     #    a. Note the "VG size".
-     #12. Using the "vgextend" command, extend the volume group "vg1" onto the
-     #    /dev/sde physical volume.
-     #13. Using the "pvdisplay" command, list the physical volumes.
-     #14. Using the "lvextend" command, extend the "/dev/vg1/CIT220" volume by
-     #    +124Mb
-     #15. Using the "vgdisplay" command, list the volume group vg1.
-     #    a. Did the "VG size" change?
-     #16. Using the "lsblk" command, locate the two 128Mb disks.
-     #    a. Ensure the extents have been expanded.
-     #17.Set the volume ownership and permissions:
-     #   a. Change the ownership of the "LABS18-01" folder to labuser1:labusers1.
-     #   b. Set the permissions of the "LABS18-01" folder to 02770.
+               cleanup_and_exit_with_code 1
+               ;;
+          -g)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is no grading module available for lab: $l_LAB."
 
-     #TFU Fix:
-     #umount /dev/mapper/vg1-CIT220
-     #sed remove /etc/fstab
-     #vgchange -a n vg1
-     #lvremove /dev/vg1/CIT220
-     #vgremove vg1
-     #pvremove /dev/sdd
-     #wipefs /dev/sdd --all --force --quiet
-     #sgdisk --zap /dev/sdd >> /dev/nul
-     #pvremove /dev/sde
-     #wipefs /dev/sde --all --force --quiet
-     #sgdisk --zap /dev/sde >> /dev/
-     #rm -r /labs/CH19/LABS10-01
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is no grading module available for lab: $l_LAB."
 
-     #resize2fs /dev/vg1/CIT220
+               cleanup_and_exit_with_code 1
 
-     #2
-     #pvcreate /dev/sdd
-     #4
-     #vgcreate vg1 /dev/sdd
-     #6
-     #lvcreate -L 124M -n CIT220 vg1
-     #8
-     #mkfs.ext4 -F -m 0 -L "CIT220" /dev/vg1/CIT220
-     #9
-     #printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01 ext4 defaults  0    0\n" >> /etc/fstab
-     #10
-     #pvcreate /dev/sde
-     #12
-     #vgextend vg1 /dev/sde
-     #14
-     #lvextend -L +124M /dev/vg1/CIT220
+               #ANSWERS LAB19-01
+               #2
+               #pvcreate /dev/sdd
 
-     #RAID
+               #4
+               #vgcreate vg1 /dev/sdd
+
+               #6
+               #lvcreate -L 124M -n CIT220 vg1
+
+               #8
+               #mkfs.ext4 -F -m 0 -L "CIT220-LVM" /dev/vg1/CIT220
+
+               #9
+               #printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01 ext4 defaults  0    0\n" >> /etc/fstab
+
+               #10
+               #pvcreate /dev/sde
+
+               #12
+               #vgextend vg1 /dev/sde
+
+               #14
+               #lvextend -L +124M /dev/vg1/CIT220
+
+               #ANSWERS LAB19-02
+               #1
+               #mdadm -C /dev/md0 -l 5 -n 3 /dev/sdf /dev/sdg /dev/sdh
+
+               #2
+               #more /proc/mdstat
+
+               #3
+               #mkfs.ext4 -F -m 0 -L "CIT220-RAID" /dev/md0
+
+               #4
+               #printf "/dev/md0 /labs/CH19/LAB19-02 ext4 defaults  0    0\n" >> /etc/fstab
+
+               #5
+               #mount /labs/CH19/LAB19-02
+
+               #6
+               #chown labuser1:labusers1 /labs/CH19/LAB19-02
+               #chmod 02770 /labs/CH19/LAB19-02
+               ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02775 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              # Set the lab number variable LAB19-01.
+              l_LAB=$(create_lab $l_CH_NUM)
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	LAB19-01
+OBJECTIVE: 	The objective of this lab is to learn how to set up a new logical volume, expand a logical volume and write to a logical volume.
+
+* You should be logged in as labuser1 with the password of ‘P@$$w0rd’
+* To complete this lab, you must be in the CH19 folder.
+
+LOGICAL VOLUMES
+1.  Using the lsblk command, locate the two 128Mb disks.
+2.  Using the pvcreate command, take the first disk /dev/sdd and create a physical volume on this disk.
+3.  Using the pvdisplay command, verify the previous command.
+4.  Using the vgcreate command, create a volume group called vg1 on /dev/sdd
+5.  Using the vgdisplay command, verify the previous command.
+6.  Using the lvcreate command, create a 124Mb logical volume on vg1 with the name CIT220
+7.  Force those changes using the vgchange --available y command.
+8.  Make an ext4 filesystem on the new logical volume at /dev/vg1/CIT220, do not reserve blocks and apply the label CIT220-LVM to the volume.
+
+    NOTE: The following warning is normal for previously written disks; choose y to continue:
+    WARNING: ext4 signature detected on /dev/vg1/CIT220 at offset 1080. Wipe it? [y/n]:
+
+9.  Mount the new logical volume:
+    a.	Make a new folder called LAB19-01 under the folder /labs/CH19
+    b.	Update the filesystem table and mount the new volume at /labs/CH19/LAB19-01.
+    c.	Using the mount command, mount the filesystem.
+10. Using the pvcreate command, take the second disk /dev/sde and create a physical volume on this disk.
+12. Using the vgdisplay command, list the volume group vg1.
+    a.	Note the VG size.
+13. Using the vgextend command, extend the volume group vg1 onto the /dev/sde physical volume.
+14. Using the pvdisplay command, list the physical volumes.
+15. Using the lvextend command, extend the /dev/vg1/CIT220 volume by +124Mb
+16. Using the vgdisplay command, list the volume group vg1.
+    a.	Did the VG size change?
+17. Using the lsblk command, locate the two 128Mb disks.
+    a.	Ensure the extents have been expanded.
+18. Set the volume ownership and permissions:
+    a.	Change the ownership of the LABS19-01 folder to labuser1:labusers1.
+    b.	Set the permissions of the LABS19-01 folder to 02770.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+
+              # CREATE LAB - SET PERMISSIONS
+              # Set the lab number variable LAB19-02.
+              l_LAB=$(create_lab $l_CH_NUM 2)
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB19-02
+OBJECTIVE:  The objective of this lab is to learn how to set up and install a new disk.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH19 folder to complete this lab.
+* Devices used: /dev/sdf, /dev/sdg, /dev/sdh
+
+RAID VOLUME
+1.  Using the mdadm command, use the devices /dev/sdf, /dev/sdg, and /dev/sdh to create a RAID 5 volume at /dev/md0.
+2.  List your running volume.
+3.  Make an ext4 filesystem on the new RAID volume at /dev/md0, do not reserve blocks, and apply the label CIT220-RAID to the volume.
+4.  Mount the new logical volume:
+    a.	Make a new folder called LAB19-02 under the folder /labs/CH19
+    b.	Update the filesystem table and mount the new volume at /labs/CH19/LAB19-02.
+5.  Using the mount command, mount the filesystem
+6.  Set the volume ownership and permissions:
+    a.	Change the ownership of the LAB19-01 folder to labuser1:labusers1.
+    b.	Set the permissions of the LAB19-01 folder to 02770.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+
+EOF
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "There is nothing to reset for lab: $l_LAB."
+               #TFU Fix:
+               #umount /dev/mapper/vg1-CIT220
+               #sed remove /etc/fstab
+               #vgchange -a n vg1
+               #lvremove /dev/vg1/CIT220
+               #vgremove vg1
+               #pvremove /dev/sdd
+               #wipefs /dev/sdd --all --force --quiet
+               #sgdisk --zap /dev/sdd >> /dev/nul
+               #pvremove /dev/sde
+               #wipefs /dev/sde --all --force --quiet
+               #sgdisk --zap /dev/sde >> /dev/
+               #rm -r /labs/CH19/LABS10-01
+
+               #resize2fs /dev/vg1/CIT220
+
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "There is nothing to reset for lab: $l_LAB."
+
+               cleanup_and_exit_with_code 1
+               ;;
+     esac
 }
 
 #CH20 - Network Configuration (No Labs)
-function chapter_twenty ()
+function chapter_20 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH20"
-     local v_LAB="$v_Working_Directory/LAB20-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
-#CH21 - Network Troubleshooting - NOT DONE
-function chapter_twenty-one ()
+#CH21 - Network Troubleshooting (No Labs)
+function chapter_21 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH21"
-     local v_LAB="$v_Working_Directory/LAB21-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #Troubleshooting Tools
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH22 - Linux Firewalls
-function chapter_twenty-two ()
+function chapter_22 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH22"
-     local v_LAB="$v_Working_Directory/LAB22-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #1.  Open a terminal window and send a continous ping to your linux server.
-     #2.  From the linux server add an iptables rule to drop all icmp packets.
-     #    a. What happened to the ping running in the other window?
-     #3.  Remove this rule from iptables.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-     #2
-     #iptables -A INPUT -p icmp -j DROP
-     #3
-     #iptables -D INPUT -p icmp -j DROP
+              #ANSWERS LAB21-01
+              #2
+              #iptables -A INPUT -p icmp -j DROP
+
+              #3
+              #iptables -D INPUT -p icmp -j DROP
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02770 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB22-01
+OBJECTIVE:  The objective of this lab is to learn how to use the IPTables firewall to block and unblock traffic.
+
+INSTRUCTIONS: These labs will test your ability to actively research how to perform a required action on a Linux operating system. All questions asked (below) should be included in a lab report. This lab report should be written in Microsoft Word and include a numbered list corresponding to the task (below). This list must include a clear screenshot of the command and its output. Please follow the instructions for submitting this assignment on Blackboard.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH22 folder to complete this lab.
+
+IPTABLES
+1.  Open a terminal window (cmd prompt – Windows) or (terminal – macOS)and send a continuous ping to your Linux server’s IP address.
+2.  From the Linux server, add an iptables rule to drop all ICMP packets.
+     a.	What happened to the ping running in the other window?
+3.  Remove this rule from iptables.
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH23 - Orchestration (No Labs)
-function chapter_twenty-three ()
+function chapter_23 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH23"
-     local v_LAB="$v_Working_Directory/LAB23-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
-#CH24 - Orchestration
-function chapter_twenty-four ()
+#CH24 - Automate Tasks
+function chapter_24 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH24"
-     local v_LAB="$v_Working_Directory/LAB24-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02775 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     # Create a script to display a message.
-     printf '#!/bin/sh' >> "$v_Working_Directory/lab2401.sh"
-     printf "wall \"It's time to stop working on these labs.\"\n" >> "$v_Working_Directory/lab2401.sh"
-     chown labuser1:labusers "$v_Working_Directory/lab2401.sh"
-     chmod 770 "$v_Working_Directory/lab2401.sh"
+     case "$l_OPER" in
+          -c)
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
+          -g)
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
 
-     #1. Using the "at" command, run the "lab2401.sh" script in five minutes.
-     #   NOTE: You will have to pass the at command the string (shown below),
-     #         dont forget to exit at with the [CTRL]+[D] keys.
-     #         /bin/sh /labs/CH24/lab2401.sh
-     #
-     #   a. View the job in the queue using the "atq" command.
-     #   b. Did it run?
-     #   c. What printed on the screen in five minures?
+               #ANSWERS LAB24-01
+               #1
+               #   at now + 5 minute
+               #at>/bin/sh /labs/CH24/lab2401.sh
+               #at>[CTRL]+[D]
+               ;;
+          -i)
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-     #1
-     #   at now + 5 minute
-     #at>/bin/sh /labs/CH24/lab2401.sh
-     #at>[CTRL]+[D]
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 $l_WORKING_DIRECTORY
+               chmod 02775 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+               # Create a script to display a message.
+               printf '#!/bin/sh' >> "$l_WORKING_DIRECTORY/lab2401.sh"
+               printf "wall \"It's time to stop working on these labs.\"\n" >> "$l_WORKING_DIRECTORY/lab2401.sh"
+               chown labuser1:labusers "$l_WORKING_DIRECTORY/lab2401.sh"
+               chmod 770 "$l_WORKING_DIRECTORY/lab2401.sh"
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	LAB24-01
+OBJECTIVE: 	The objective of this lab is to learn how to automate impromptu tasks.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH24 folder to complete this lab.
+
+SCHEDULING JOBS
+1.  Using the at command, run the lab2401.sh script located in the CH24 folder in five (5) minutes.
+    a.	View the job in the queue using the atq command.
+    b.	Did it run?
+    c.	What printed on the screen in five minutes?
+
+     NOTE:	You will have to pass the at command the string (shown below), don’t forget to exit at with the [CTRL]+[D] keys.
+               /bin/sh /labs/CH24/lab2401.sh
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
+          -r)
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
+     esac
 }
 
 #CH25 - Localization
-function chapter_twenty-five ()
+function chapter_25 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH25"
-     local v_LAB="$v_Working_Directory/LAB25-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #1.  Display the system time.
-     #2.  Display the hardware clock.
-     #3.  Display the current timezone set.
-     #    a. What is it set to?
-     #4.  Change the timezone to /usr/share/zoneinfo/America/New_York by
-     #    updating the symbolic link to this file.
-     #5.  View the time settings using the "datetimectl" command.
-     #    a. is NTP active?
-     #6.  Using the "local -a" command, list the cirrently installed locale's
-     #    a. What locale's are installed?
-     #7.  Using the "localectl" command view the current keyboard layout.
-     #    a. What do you notice about the keyboard type?
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-     #1
-     #date
-     #2
-     #hwclock
-     #3
-     #ls -l /etc/localtime
-     #4
-     #ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
-     #ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime #(reset)
-     #5
-     #datetimectl
-     #6
-     #locale -a
-     #7
-     #localectl status
+              #ANSWERS LAB25-01
+              #1
+              #date
 
+              #2
+              #hwclock
+
+              #3
+              #ls -l /etc/localtime
+
+              #4
+              #ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+              #ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime #(reset)
+
+              #5
+              #datetimectl
+
+              #6
+              #locale -a
+
+              #7
+              #localectl status
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02770 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	LAB25-01
+OBJECTIVE: 	The objective of this lab is to learn how to manipulate the locale settings.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH25 folder to complete this lab.
+
+DATE/TIME
+1.  Display the system time.
+2.  Display the hardware clock.
+3.  Display the current time zone setting.
+    a.	What is it set to?
+4.  Change the time zone to /usr/share/zoneinfo/America/New_York by updating the symbolic link to this file.
+5.  Using the datetimectl command, view the time settings.
+    a.	Is NTP active?
+6.  Using the local -a command, list the currently installed locale's
+    a.	What locales are installed?
+7.  Using the localectl command, view the current keyboard layout.
+    a.	What do you notice about the keyboard type?
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH26 - Bash Scripting Essentials
-function chapter_twenty-six ()
+function chapter_26 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH26"
-     local v_LAB="$v_Working_Directory/LAB26-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #1.  Write a bash script that will count from 1 to 10 in increments of one,
-     #    two and five.
-     #2.  Write a bash script that will prompt you for your weight and calculate
-     #    your weight on the moon.  You must use a constant for the moon weight.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
-     #1
-     #    #!/bin/bash
-     #    for i in {1..10}; do      echo $i; done
-     #    for i in {1..10..2}; do      echo $i; done
-     #    for i in {1..10..5}; do      echo $i; done
-     #2
-     #    #!/bin/bash
-     #    moon_pct_diff=.165
-     #    read -p "Enter your weight on the earth's surface: " weight
-     #    pct_weight=$(echo "$weight*$moon_pct_diff" | bc)
-     #    moon_weight=$(printf %.2f $(echo "scale=2;($weight-$pct_weight)" | bc))
-     #    echo "Your weight on the moon is:" $moon_weight
+              #ANSWERS LAB26-01
+              #1
+              #    #!/bin/bash
+              #    for i in {1..10}; do         echo $i; done
+              #    for i in {1..10..2}; do      echo $i; done
+              #    for i in {1..10..5}; do      echo $i; done
+
+              #2
+              #    #!/bin/bash
+              #    moon_pct_diff=.165
+              #    read -p "Enter your weight on the earth's surface: " weight
+              #    pct_weight=$(echo "$weight*$moon_pct_diff" | bc)
+              #    moon_weight=$(printf %.2f $(echo "scale=2;($weight-$pct_weight)" | bc))
+              #    echo "Your weight on the moon is:" $moon_weight
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02770 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	LAB26-01
+OBJECTIVE: 	The objective of this lab is to learn how to write BASH scripts.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH26 folder to complete this lab.
+
+BASH
+1.  Using your book and the Internet as a reference, write a BASH script that meets the following criteria:
+    a.	Using a looping structure, count from 1-10 in one-step increments.
+    b.	Using a looping structure, count from 1-10 in two-step increments.
+    c.	Using a looping structure, count from 1-10 in five-step increments.
+2.  Using your book and the Internet as a reference, write a BASH script that calculates the difference between your weight on the Earth and your weight on the moon. As a reference, you are 16.5% lighter on the moon. The BASH script must meet the following criteria:
+    a.	You must use a constant variable that holds the percentage difference.
+    b.	You must prompt the user to enter their weight on Earth.
+    c.	If your moon weight results in a decimal, you must truncate that decimal to two decimal places.
+    d.	You must print your weight on the moon.
+    e.	Your logic must be correct.
+EOF
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH27 - Git
-function chapter_twenty-seven()
+function chapter_27 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH27"
-     local v_LAB="$v_Working_Directory/LAB27-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #1.  Look in the "/labs/CH26" folder.
-     #    a. What do you see?
-     #2.  The "lsRules" is a clone of a script from my public repository on
-     #    GitHub.
-     #3.  Make a new folder in the "CH26" follder, call it "lab26-01".
-     #4.  Change to the "lab26-01" folder.
-     #5.  Create a personal account on GitHub (unless you already have one).
-     #6.  Set your global identity using the following two commands:
-     #    a. git config --global user.email "email@acd.ccac.edu"
-     #    b. git config --global user.name "Your Name"
-     #
-     #    NOTE: The email address and name values must match your GitHub
-     #          account name and email address.
-     #
-     #7.  Set the main branch default as follows:
-     #    a. git config --global init.defaultBranch main
-     #8.  Generate an ssh key using the following command:
-     #    a. ssh-keygen -t ed25519 -C "email@acd.ccac.edu"
-     #    b. Start the ssh-agent and add the key you just generated.
-     #    c. Add that ssh key to your GitHub account.
-     #
-     #    NOTE: Review the references below before coming to me with questions.
-     #
-     #9.  On GitHub, create a new repository called "lab26-01" and copy the
-     #    SSH of that repository.
-     #10. Create a README.md file and place the following information in the
-     #    first four lines (minus the letters a-d of course):
-     #    a. # LAB26-01
-     #    b. **LAB26-01** - A lab that shows me how to use Git.
-     #    c. FirstName LastName <email@acd.ccac.edu>
-     #    d. Copyright &copy; FirstName LastName 2023.
-     #11. Initilize the git repository.
-     #    a. What happened?
-     #12. Add the README.md file to the repository.
-     #13. Commit your changes.
-     #    a. What happened?
-     #14. Add your GitHub repository.
-     #    a. git remi=ote add origin <HTTPS URL FROM GITHUB>
-     #15. Push your changes.
-     #16. Make several updates, add files, change the contents of the README
-     #    file, then follow steps 12-15 to update your repository, and look
-     #    for those changes on GitHub.
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
 
+              #ANSWERS LAB26-01
+              #3
+              #mkdir /labs/CH26/lab26-01
 
-     #REFERENCES
-     #https://www.geeksforgeeks.org/how-to-push-folders-from-local-pc-to-github-using-git-commands/
-     #https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux
-     #https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+              #4
+              #cd /labs/CH26/lab26-01
 
-     #3
-     #mkdir /labs/CH26/lab26-01
+              #6
+              #git config --global user.email "matthew.kisow@icloud.com"
+              #git config --global user.name "DoctorKisow"
 
-     #4
-     #cd /labs/CH26/lab26-01
+              #7
+              #git config --global init.defaultBranch main
 
-     #6
-     #git config --global user.email "matthew.kisow@icloud.com"
-     #git config --global user.name "DoctorKisow"
+              #8
+              #ssh-keygen -t ed25519 -C "matthew.kisow@icloud.com"
+              #eval "$(ssh-agent -s)"
+              #ssh-add ~/.ssh/id_ed25519
+              #cat ~/.ssh/id_ed25519.pub
 
-     #7
-     #git config --global init.defaultBranch main
+              #10
+              #printf "#LAB26-02\n" >> README
+              #printf "**LAB26-02** - A lab that shows me how to use Git.\n" >> README
+              #printf "Dr. Matthew Kisow <mkisow@ccac.edu>\n" >> README
+              #printf "Copyright &copy; D. Matthew Kisow 2022-2023.\n" >> README
 
-     #8
-     #ssh-keygen -t ed25519 -C "matthew.kisow@icloud.com"
-     #eval "$(ssh-agent -s)"
-     #ssh-add ~/.ssh/id_ed25519
-     #cat ~/.ssh/id_ed25519.pub
+              #11
+              #git init
 
-     #10
-     #printf "#LAB26-02\n" >> README
-     #printf "**LAB26-02** - A lab that shows me how to use Git.\n" >> README
-     #printf "Dr. Matthew Kisow <mkisow@ccac.edu>\n" >> README
-     #printf "Copyright &copy; D. Matthew Kisow 2022-2023.\n" >> README
+              #12
+              #git add README.md
 
-     #11
-     #git init
+              #13
+              #git commit -m "first comit"
 
-     #12
-     #git add README.md
+              #14
+              #git remote add origin https://github.com/DoctorKisow/lab27-02.git
 
-     #13
-     #git commit -m "first comit"
+              #15
+              #git push -u origin main
+              ;;
+          -i)
+              info "Setting up the labs for chapter: $l_CH_NUM."
 
-     #14
-     #git remote add origin https://github.com/DoctorKisow/lab27-02.git
+              # SET SECURITY
+              info "  Creating the chapter: $l_CH_NUM directory."
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-     #15
-     #git push -u origin main
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              chmod 02770 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+              #SETUP GIT - CLONE lsRules
+              cd "$l_WORKING_DIRECTORY"
+              git clone https://github.com/DoctorKisow/lsRules.git
+
+cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+LAB:	       LAB27-01
+OBJECTIVE:  The objective of this lab is to learn how to use the git command and GitHub.
+
+* You should be logged in as labuser1 with the password ‘P@$$w0rd’
+* You must be in the /labs/CH27 folder to complete this lab.
+
+GIT
+1.  List the contents of the /labs/CH27 folder.
+    a.	What do you see?
+2.  The lsRules is a clone of a script from my public repository on GitHub.
+3.  Make a new folder in the /labs/CH27 folder; call it lab27-01"
+4.  Change to the lab27-01 folder.
+5.  Create a personal account on GitHub (unless you already have one).
+6.  Set your global identity using the following two commands:
+    a.	git config --global user.email "email@acd.ccac.edu"
+    b.	git config --global user.name "Your Name"
+
+    NOTE:	The email address and name values must match your GitHub account name and email address.
+
+7.  Set the main branch default as follows:
+    a.	git config --global init.defaultBranch main
+8.  Generate an ssh key using the following command:
+    a.	ssh-keygen -t ed25519 -C "email@acd.ccac.edu"
+    b.	Start the ssh-agent and add the key you just generated.
+    c.	Add that ssh key to your GitHub account.
+
+    NOTE: Review the references below before coming to me with questions.
+
+9.  On GitHub, create a new repository called "lab27-01" and copy the SSH of that repository.
+10. Create a README.md file and place the following information in the first four lines (minus the letters a-d, of course):
+    a.	# LAB27-01
+    b.	**LAB27-01** - A lab that shows me how to use Git.
+    c.	FirstName LastName <email@acd.ccac.edu>
+    d.	Copyright &copy; FirstName LastName 2023.
+11. Initialize the git repository.
+    a.	What happened?
+12. Add the README.md file to the repository.
+13. Commit your changes.
+    a.	What happened?
+14. Add your GitHub repository.
+    a.	git remote add origin <HTTPS URL FROM GITHUB>
+15. Push your changes.
+16. Make several updates, add files, change the contents of the README.md file, follow steps 12-15 to update your repository, and look for those changes on GitHub.
+
+REFERENCES
+https://www.geeksforgeeks.org/how-to-push-folders-from-local-pc-to-github-using-git-commands/
+https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux
+https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account
+
+# Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
+# Dr. Matthew Kisow
+EOF
+
+              info "  Setting the ownership and permissions for lab number: $l_LAB."
+              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH28 - Server Roles (No Labs)
-function chapter_twenty-eight ()
+function chapter_28 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH28"
-     local v_LAB="$v_Working_Directory/LAB28-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
+
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 #CH29 - Security Best Practice (No Labs)
-function chapter_twenty-nine ()
+function chapter_29 ()
 {
-     local v_Working_Directory="$g_LAB_PATH/CH29"
-     local v_LAB="$v_Working_Directory/LAB29-01"
+     local l_OPER="$1"
+     local l_CH_NUM="$2"
+     local l_WORKING_DIRECTORY=""
+     local l_LAB=""
 
-     # CREATE DIRECTORIES
-     mkdir "$v_Working_Directory"
+     # Verify the function was passed the correct operation.
+     if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
+          error "Function was passed an expression that was out of range."
+     fi
 
-     # SET SECURITY
-     chmod 02770 "$v_Working_Directory"
+     # Set the lab number variable.
+     l_LAB=$(create_lab $l_CH_NUM)
 
-     #TODO: Chroot an Apache server
+     case "$l_OPER" in
+          -c)
+              info "There is no lab to roll forward for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -g)
+              info "There is no grading module available for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+          -i)
+              info "There is no lab available for this chapter."
+              #info "Setting up the labs for chapter: $l_CH_NUM."
+
+              # SET SECURITY
+              #info "  Creating the chapter: $l_CH_NUM directory."
+              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+
+              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chmod 02754 "$l_WORKING_DIRECTORY"
+
+              # CREATE LAB - SET PERMISSIONS
+              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+
+#cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
+#EOF
+              #info "  Setting the ownership and permissions for lab number: $l_LAB."
+              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+              ;;
+          -r)
+              info "There is nothing to reset for lab: $l_LAB."
+              cleanup_and_exit_with_code 1
+              ;;
+     esac
 }
 
 # *************************** begin of script proper ***************************
@@ -2651,25 +4311,116 @@ if ((g_ARG_UPDATE==0)); then
 fi
 
 if ((g_ARG_CHANGE_LAB==1)); then
-     info "Change a lab to completed."
-
-     #if [ $EUID -ne 1000 ]; then
-     if [ $EUID -ne 0 ]; then
+     if [ $EUID -ne 1000 ]; then
           warning "This option can only be run by your instructor."
           cleanup_and_exit_with_code 1
+     else
+          chapter_$g_ARG_CHANGE -c $g_ARG_CHANGE
      fi
 fi
 
 if ((g_ARG_GRADE_LAB==1)); then
-     info "Grade a completed lab."
+     info "Grading lab: $g_ARG_GRADE..."
+     chapter_$g_ARG_GRADE -g $g_ARG_GRADE
 fi
 
 if ((g_ARG_INSTALL==1)); then
-     info "Install the lab enviornment using this script."
+     info "Starting installation of the lab enviornment."
+
+     if [[ -f "$g_LAB_PATH/.lid" ]]; then
+          source "$g_LAB_PATH/.lid"
+     fi
+
+     # Completely wipe the installation.
+     #if [ $EUID -ne 1000 ]; then
+     if [ $EUID -ne 0 ]; then
+          warning "This option can only be run by your instructor."
+          cleanup_and_exit_with_code 1
+     else
+          #if [ -n "$g_INSTALL_DATE" ]; then
+          #     printf "The install date of this lab was on: $g_INSTALL_DATE\n"
+          #
+          #     if test_yn "Are you sure you want to reinstall the lab enviornment"; then
+          #          info "Completely removing the lab enviornment."
+          #          info "  Removing the directory and symlink."
+          #          if [[ -d "$g_LAB_PATH" ]]; then
+          #               rm -r "$g_LAB_PATH"
+          #          fi
+          #
+          #          if [[ -h "$g_LAB_SYMLINK" ]]; then
+          #               rm -r "$g_LAB_SYMLINK"
+          #          fi
+          #
+          #          info "  Removing users and their home directories."
+          #          gpasswd --delete labuser1 sudo
+          #          test_user labuser1
+          #          test_user labuser2
+          #          test_user labuser3
+          #          test_user labuser4
+          #
+          #          info "  Removing security groups."
+          #          test_group labusers1
+          #          test_group labusers2
+          #
+          #          # Chapter 8 (Remove hwsnbn.sh)
+          #          sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
+          #
+          #          # Chapter 12 (Remove Quotas, Restore /etc/fstab)
+          #          quotaoff "/Lab Files/CH12/LAB12-02"
+          #          umount "/Lab Files/CH12/LAB12-02/"
+          #          rm "/Lab Files/CH12/LAB12-02/*"
+          #
+          #          # Restore /etc/fstab created when labs were installed.
+          #          if [ -f /etc/fstab.bak ]; then
+          #               info "  Restoring the /etc/fstab file."
+          #               mv /etc/fstab{.bak,} &>/dev/null
+          #          else
+          #              warning "The backup copy of the filesystem table no longer exists."
+          #          fi
+          #
+          #          info "Removing installed packages."
+          #          #CH06 (ifconfig)
+          #          apt -y remove net-tools -qq &>/dev/null
+          #          #CH07
+          #          apt -y remove tree -qq &>/dev/null
+          #          #CH09
+          #          apt -y remove acl -qq &>/dev/null
+          #          #CH11
+          #          apt -y remove zip -qq &>/dev/null
+          #          #CH12
+          #          apt -y remove quota -qq &>/dev/null
+          #          #CH16
+          #          apt -y remove sysstat -qq &>/dev/null
+          #          apt -y remove procinfo -qq &>/dev/null
+          #          #CH20
+          #          apt -y remove network-manager -qq &>/dev/null
+          #          #CH21
+          #          apt -y remove whois -qq &>/dev/null
+          #          #CH23
+          #          apt -y remove at -qq &>/dev/null
+          #          #CH27
+          #          apt -y remove git -qq &>/dev/null
+          #     fi
+
+               info "The lab enviornment has been completely removed."
+          #fi
+     fi
+
+     # Install Base then install labs.
+     base
+
+     # Loop through the chapters, setting up each lab.
+     for $i in {1..29}; do
+          chapter_$i -i $i
+     done
+
+     info "Finishing the installation of the lab enviornment."
+     cleanup_and_exit_with_code 0
 fi
 
 if ((g_ARG_ROLLBACK_LAB==1)); then
-     info "Rollback the lab to the beginning."
+     info "Resetting lab: $g_ARG_ROLLBACK..."
+     chapter_$g_ARG_ROLLBACK -r $g_ARG_ROLLBACK
 fi
 
 if ((g_ARG_UPDATE==1)); then
@@ -2677,51 +4428,4 @@ if ((g_ARG_UPDATE==1)); then
 fi
 
 cleanup_and_exit_with_code 0
-
-# Main Script Start
-#base
-#chapter_one
-#chapter_two
-#chapter_three
-#chapter_four
-#chapter_five
-#chapter_six
-#chapter_seven
-#chapter_eight
-#chapter_nine
-#chapter_ten
-#chapter_eleven
-#chapter_twelve
-#chapter_thirteen
-#chapter_fourteen
-#chapter_fifteen
-#chapter_sixteen
-#chapter_seventeen
-#chapter_eighteen
-#chapter_nineteen
-#chapter_twenty
-#chapter_twenty-one
-#chapter_twenty-two
-#chapter_twenty-three
-#chapter_twenty-four
-#chapter_twenty-five
-#chapter_twenty-six
-#chapter_twenty-seven
-#chapter_twenty-eight
-#chapter_twenty-nine
 # **************************** end of script proper ****************************
-
-
-# NOTES
-################################################################################
-# Remove user from group
-# deluser <username> <groupname>
-#
-# Add user to group, -g (primary group), -G (additional group)
-# usermod -a [-G|-g] <group name> <username>
-#
-#  UID GID OID OWNER GROUP OTHER
-#    4   2   1   rwx   rwx   rwx
-# READ WRITE EXECUTE
-#    4     2       1
-################################################################################
