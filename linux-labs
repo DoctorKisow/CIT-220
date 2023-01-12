@@ -304,22 +304,6 @@ function internal_consistency_option_checks ()
      done
 }
 
-# (test_yn) - Function used to test for a "y" or "n" input from the keyboard.
-function test_yn ()
-{
-     # (l_REPLY) - Local string value used to hold the response from the keyboard.
-     local l_REPLY=""
-
-     echo -n -e "${g_SHOWPREFIX}${1} (y/n)? ${g_ALERT_TEXT}"
-     read -r -n 1
-     echo
-     if [[ ${l_REPLY} =~ ^[Yy]$ ]]; then
-          return 1
-     else
-          return 0
-     fi
-}
-
 # (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
 function test_user ()
 {
