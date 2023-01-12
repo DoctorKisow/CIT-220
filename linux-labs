@@ -621,6 +621,7 @@ function base ()
      systemctl stop ssh.service &>/dev/null
 
      # Set a sourceable file that lists the install date.
+     info "  Creating installation timestamp file."
      l_TIMESTAMP=$(echo $(date +%d-%b-%Y) | tr '[:lower:]' '[:upper:]')
      if [ -f "$g_LAB_PATH/.lid" ]; then
           warning "A previous lab enviornment may not have been cleaned up corretly."
@@ -633,8 +634,8 @@ function base ()
 
      # Create script to move installation script to labs directory
      if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
+          info "Moving this script into the $g_LAB_PATH folder, please restart the script."
           printf '#!/bin/bash\n\n' >> install.sh
-          printf "This script was created by the $g_PROGNAME installation, and can safely be removed.\n" >> install.sh
 
           if [ "$g_SCRIPT_PATH" == "/" ]; then
                printf "mv \"/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
