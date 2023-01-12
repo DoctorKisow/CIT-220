@@ -678,7 +678,7 @@ function chapter_1 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "S"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -731,7 +731,7 @@ function chapter_2 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -784,7 +784,7 @@ function chapter_3 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -837,7 +837,7 @@ function chapter_4 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -1058,7 +1058,7 @@ function chapter_6 ()
                l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
                info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-               #chown root:labusers1 $l_WORKING_DIRECTORY
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
                chmod 02774 "$l_WORKING_DIRECTORY"
 
                # CREATE LAB - SET PERMISSIONS
@@ -2477,7 +2477,7 @@ function chapter_10 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -2748,7 +2748,7 @@ function chapter_12 ()
                l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
                info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-               #chown root:labusers1 $l_WORKING_DIRECTORY
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
                chmod 02775 "$l_WORKING_DIRECTORY"
 
                # CREATE LAB - SET PERMISSIONS
@@ -2961,7 +2961,7 @@ function chapter_13 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3014,7 +3014,7 @@ function chapter_14 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3067,7 +3067,7 @@ function chapter_15 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3156,7 +3156,7 @@ function chapter_16 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              chown root:labusers1 $l_WORKING_DIRECTORY
+              chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02744 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3245,7 +3245,7 @@ function chapter_17 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3297,7 +3297,7 @@ function chapter_18 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              chown root:labusers1 $l_WORKING_DIRECTORY
+              chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02775 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3441,7 +3441,7 @@ function chapter_19 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02775 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3591,7 +3591,7 @@ function chapter_20 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3644,7 +3644,7 @@ function chapter_21 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3703,7 +3703,7 @@ function chapter_22 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02770 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3772,7 +3772,7 @@ function chapter_23 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -3830,7 +3830,7 @@ function chapter_24 ()
                l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
                info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-               #chown root:labusers1 $l_WORKING_DIRECTORY
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
                chmod 02775 "$l_WORKING_DIRECTORY"
 
                # CREATE LAB - SET PERMISSIONS
@@ -3928,7 +3928,7 @@ function chapter_25 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02770 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -4017,7 +4017,7 @@ function chapter_26 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02770 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -4127,7 +4127,7 @@ function chapter_27 ()
               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02770 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -4236,7 +4236,7 @@ function chapter_28 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
@@ -4289,7 +4289,7 @@ function chapter_29 ()
               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
+              #chown root:labusers1 "$l_WORKING_DIRECTORY"
               #chmod 02754 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
