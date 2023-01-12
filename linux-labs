@@ -24,9 +24,12 @@
 # ##############################################################################
 # Virtual Machine Setup
 #
-# SCSI1: 20Gb     /dev/sda1     1Gb     /boot/efi
-#                 /dev/sda2     19Gb    /
-# SCSI2: 128Mb    /dev/sdb1             /Lab Files/CH12
+# SCSI1: 15Gb     /dev/sda1               715   Mb   /boot/efi
+#                 /dev/sda2                 1.8 Gb   /boot
+#                 /dev/sda3                12.5 Gb
+#                 |-ubuntu--vg-ubuntu-lvm  10   Gb   /
+#
+# SCSI2: 128Mb    /dev/sdb1                          /Lab Files/CH12
 # SCSI3: 128Mb    LAB18-01
 # SCSI4: 128Mb    LAB19-01      LVM
 # SCSI5: 128Mb    LAB19-01      LVM
@@ -34,12 +37,6 @@
 # SCSI7: 128Mb    LAB19-02      RAID
 # SCSI8: 128Mb    LAB19-02      RAID
 # ##############################################################################
-
-# !!!!!!!!!!!!
-# ! ssh still disabled in base
-# ! need to change lab paths
-# ! update version
-
 
 # Scroll to the bottom of this script to follow the main script flow.
 
@@ -55,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.5"
+g_VERSION="0.0.7"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -80,10 +77,8 @@ if [[ -v TERM && -n "${TERM}" && "${TERM}" != "dumb" ]]; then
 fi
 
 # (g_LAB_PATH) - Strings that hold the location to the lab files.
-#g_LAB_PATH="/Lab Files"
-#g_LAB_SYMLINK="/labs"
-g_LAB_PATH="/home/mkisowa/Lab Files" #TESTING
-g_LAB_SYMLINK="/home/mkisowa/labs"   #TESTING
+g_LAB_PATH="/Lab Files"
+g_LAB_SYMLINK="/labs"
 g_DIR_PREFIX="CH"
 g_LAB_PREFIX="LAB"
 
@@ -506,8 +501,6 @@ function create_lab ()
 function base ()
 {
      local l_LABUSER_PASS="P@\$\$w0rd"
-     local l_ABS_PATH=""
-     local l_DEV
 
      # Ensure we have the necessary block devices available.
      if [ $(lsblk | grep -o "^sd[a-z]" | wc -l) -ne 8 ]; then
@@ -616,8 +609,8 @@ function base ()
 
      # DISABLE SSH (CH05 LAB)
      info "  Disabling the ssh service."
-     #systemctl disable ssh.service
-     #systemctl stop
+     systemctl disable ssh.service
+     systemctl stop
 
      # Set a sourceable file that lists the install date.
      l_TIMESTAMP=$(echo $(date +%d-%b-%Y) | tr '[:lower:]' '[:upper:]')
@@ -629,10 +622,6 @@ function base ()
      printf "g_INSTALL_DATE=$l_TIMESTAMP\n" >> "$g_LAB_PATH/.lid"
      chown root:root "$g_LAB_PATH/.lid"
      chmod 00440 "$g_LAB_PATH/.lid"
-
-     # Create a script to move this script into the labs folder.
-     #l_ABS_PATH="`dirname \"$0\"`"
-     #l_ABS_PATH="`( cd \"$l_ABS_PATH\" && pwd )`"
 
      # Create script to move installation script to labs directory
      if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
