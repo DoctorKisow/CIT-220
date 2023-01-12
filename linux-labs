@@ -634,14 +634,18 @@ function base ()
 
      # Create script to move installation script to labs directory
      if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
-          info "Moving this script into the $g_LAB_PATH folder, please restart the script."
+          info "Moving this script into the \"$g_LAB_PATH\" folder, please restart the\n        script from that location."
           printf '#!/bin/bash\n\n' >> install.sh
 
           if [ "$g_SCRIPT_PATH" == "/" ]; then
                printf "mv \"/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+               printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+               printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
                printf "rm \"/install.sh\"\n" >> install.sh
           else
                printf "mv \"$g_SCRIPT_PATH/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+               printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+               printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
                printf "rm \"$g_SCRIPT_PATH/install.sh\"\n" >> install.sh
           fi
 
