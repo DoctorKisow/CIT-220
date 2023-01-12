@@ -4429,7 +4429,7 @@ if ((g_ARG_INSTALL==1)); then
                fi
 
                info "The lab enviornment has been completely removed."
-          #fi
+          fi
      fi
 
      # Install Base then install labs.
