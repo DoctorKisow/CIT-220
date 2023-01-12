@@ -52,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.9"
+g_VERSION="0.0.10"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -2860,9 +2860,9 @@ EOF
                sgdisk -n 1:0:262110 -t 1:8300 /dev/sdb >> /dev/nul
                mkfs.ext4 /dev/sdb1 >> /dev/null 2>&1
 
-               mkdir "$l_WORKING_DIRECTORY/$l_LAB"
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB-Q"
                cp /etc/fstab{,.bak}
-               printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
+               printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02-Q	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
                mount /labs/CH12/LAB12-02
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
@@ -2885,19 +2885,19 @@ QUOTAS
     e.	Set the login shell to /bin/bash.
     f.	The user must have a home directory set to /home/labuser5
     g.	Set the password to P@$$w0rd.
-2.  Using the quotacheck command, update the quota volume mounted at: /Lab Files/CH12/LAB12-02
+2.  Using the quotacheck command, update the quota volume mounted at: /Lab Files/CH12/LAB12-02-Q
 3.  Using the edquota command, edit the quota for the labuser5 user, setting the quota as shown below, then exit edquota.
     Filesystem                   blocks       soft       hard     inodes     soft     hard
     /dev/sdb1                         0         50        100          0        0        0
-4.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02 folder.
+4.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02-Q folder.
     a.	Using the vim editor, create a new file called file.labuser5, inside of that file place ten (10) lines of any single CAPITAL letter. Each line should be twenty (20) characters wide.
     b.	Exit from the labuser5 account.
 5.  Using the quota command, check the quota for labuser5.
     a.	What do you see?
-    6.	Turn the quota system on for /Lab Files/CH12/LAB12-02.
-7.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02 folder.
+    6.	Turn the quota system on for /Lab Files/CH12/LAB12-02-Q.
+7.  Using the su command, switch to the labuser5 account and navigate to the /Lab Files/CH12/LAB12-02-Q folder.
     a.	Type quota and view the output.
-    b.	Using the cp command, copy all of the /etc folder into the /Lab Files/CH12/LAB12-02 folder.
+    b.	Using the cp command, copy all of the /etc folder into the /Lab Files/CH12/LAB12-02-Q folder.
     c.	What happened?
     d.	Exit from the labuser5 account.
 
@@ -4339,7 +4339,6 @@ if ((g_ARG_INSTALL==1)); then
           source "$g_LAB_PATH/.lid"
      fi
 
-
      #if [ $EUID -ne 1000 ]; then
      if [ $EUID -ne 0 ]; then
           warning "This option can only be run by your instructor."
@@ -4377,9 +4376,9 @@ if ((g_ARG_INSTALL==1)); then
                sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
 
                # Chapter 12 (Remove Quotas, Restore /etc/fstab)
-               quotaoff "/Lab Files/CH12/LAB12-02"
-               umount "/Lab Files/CH12/LAB12-02/"
-               rm "/Lab Files/CH12/LAB12-02/*"
+               quotaoff "/Lab Files/CH12/LAB12-02-Q"
+               umount "/Lab Files/CH12/LAB12-02-Q/"
+               rm "/Lab Files/CH12/LAB12-02-Q/*"
 
                # Restore /etc/fstab created when labs were installed.
                if [ -f /etc/fstab.bak ]; then
