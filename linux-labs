@@ -4344,8 +4344,6 @@ if ((g_ARG_GRADE_LAB==1)); then
 fi
 
 if ((g_ARG_INSTALL==1)); then
-     local l_REPLY
-     
      info "Starting installation of the lab enviornment."
 
      # Is this linux a supported device?
