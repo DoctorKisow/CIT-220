@@ -4339,92 +4339,92 @@ if ((g_ARG_INSTALL==1)); then
           source "$g_LAB_PATH/.lid"
      fi
 
-     # Completely wipe the installation.
+
      #if [ $EUID -ne 1000 ]; then
      if [ $EUID -ne 0 ]; then
           warning "This option can only be run by your instructor."
           cleanup_and_exit_with_code 1
-     else
-          if [ -n "$g_INSTALL_DATE" ]; then
-               printf "The install date of this lab was on: $g_INSTALL_DATE\n"
+     fi
 
-               read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
-               if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
-                    info "Completely removing the lab enviornment."
-                    info "  Removing the directory and symlink."
-                    if [[ -d "$g_LAB_PATH" ]]; then
-                         rm -r "$g_LAB_PATH"
-                    fi
+     if [ -n "$g_INSTALL_DATE" ]; then
+          printf "The install date of this lab was on: $g_INSTALL_DATE\n"
 
-                    if [[ -h "$g_LAB_SYMLINK" ]]; then
-                         rm -r "$g_LAB_SYMLINK"
-                    fi
-
-                    info "  Removing users and their home directories."
-                    gpasswd --delete labuser1 sudo
-                    test_user labuser1
-                    test_user labuser2
-                    test_user labuser3
-                    test_user labuser4
-                    test_user labuser5
-
-                    info "  Removing security groups."
-                    test_group labusers1
-                    test_group labusers2
-
-                    # Chapter 8 (Remove hwsnbn.sh)
-                    sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
-
-                    # Chapter 12 (Remove Quotas, Restore /etc/fstab)
-                    quotaoff "/Lab Files/CH12/LAB12-02"
-                    umount "/Lab Files/CH12/LAB12-02/"
-                    rm "/Lab Files/CH12/LAB12-02/*"
-
-                    # Restore /etc/fstab created when labs were installed.
-                    if [ -f /etc/fstab.bak ]; then
-                         info "  Restoring the /etc/fstab file."
-                         mv /etc/fstab{.bak,} &>/dev/null
-                    else
-                        warning "The backup copy of the filesystem table no longer exists."
-                    fi
-
-                    info "Removing installed packages."
-                    #CH06 (ifconfig)
-                    info "   Removing the net-tools package(s)."
-                    apt -y remove net-tools -qq &>/dev/null
-                    #CH07
-                    info "   Removing the tree package(s)."
-                    apt -y remove tree -qq &>/dev/null
-                    #CH09
-                    info "   Removing the acl package(s)."
-                    apt -y remove acl -qq &>/dev/null
-                    #CH11
-                    info "   Removing the zip package(s)."
-                    apt -y remove zip -qq &>/dev/null
-                    #CH12
-                    info "   Removing the quota package(s)."
-                    apt -y remove quota -qq &>/dev/null
-                    #CH16
-                    info "   Removing the sysstat package(s)."
-                    apt -y remove sysstat -qq &>/dev/null
-                    info "   Removing the procinfo package(s)."
-                    apt -y remove procinfo -qq &>/dev/null
-                    #CH20
-                    info "   Removing the network-managerpackage(s)."
-                    apt -y remove network-manager -qq &>/dev/null
-                    #CH21
-                    info "   Removing the whois package(s)."
-                    apt -y remove whois -qq &>/dev/null
-                    #CH23
-                    info "   Removing the at package(s)."
-                    apt -y remove at -qq &>/dev/null
-                    #CH27
-                    info "   Removing the git package(s)."
-                    apt -y remove git -qq &>/dev/null
+          read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
+          if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
+               info "Completely removing the lab enviornment."
+               info "  Removing the directory and symlink."
+               if [[ -d "$g_LAB_PATH" ]]; then
+                    rm -r "$g_LAB_PATH"
                fi
 
-               info "The lab enviornment has been completely removed."
+               if [[ -h "$g_LAB_SYMLINK" ]]; then
+                    rm -r "$g_LAB_SYMLINK"
+               fi
+
+               info "  Removing users and their home directories."
+               gpasswd --delete labuser1 sudo
+               test_user labuser1
+               test_user labuser2
+               test_user labuser3
+               test_user labuser4
+               test_user labuser5
+
+               info "  Removing security groups."
+               test_group labusers1
+               test_group labusers2
+
+               # Chapter 8 (Remove hwsnbn.sh)
+               sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
+
+               # Chapter 12 (Remove Quotas, Restore /etc/fstab)
+               quotaoff "/Lab Files/CH12/LAB12-02"
+               umount "/Lab Files/CH12/LAB12-02/"
+               rm "/Lab Files/CH12/LAB12-02/*"
+
+               # Restore /etc/fstab created when labs were installed.
+               if [ -f /etc/fstab.bak ]; then
+                    info "  Restoring the /etc/fstab file."
+                    mv /etc/fstab{.bak,} &>/dev/null
+               else
+                   warning "The backup copy of the filesystem table no longer exists."
+               fi
+
+               info "Removing installed packages."
+               #CH06 (ifconfig)
+               info "   Removing the net-tools package(s)."
+               apt -y remove net-tools -qq &>/dev/null
+               #CH07
+               info "   Removing the tree package(s)."
+               apt -y remove tree -qq &>/dev/null
+               #CH09
+               info "   Removing the acl package(s)."
+               apt -y remove acl -qq &>/dev/null
+               #CH11
+               info "   Removing the zip package(s)."
+               apt -y remove zip -qq &>/dev/null
+               #CH12
+               info "   Removing the quota package(s)."
+               apt -y remove quota -qq &>/dev/null
+               #CH16
+               info "   Removing the sysstat package(s)."
+               apt -y remove sysstat -qq &>/dev/null
+               info "   Removing the procinfo package(s)."
+               apt -y remove procinfo -qq &>/dev/null
+               #CH20
+               info "   Removing the network-managerpackage(s)."
+               apt -y remove network-manager -qq &>/dev/null
+               #CH21
+               info "   Removing the whois package(s)."
+               apt -y remove whois -qq &>/dev/null
+               #CH23
+               info "   Removing the at package(s)."
+               apt -y remove at -qq &>/dev/null
+               #CH27
+               info "   Removing the git package(s)."
+               apt -y remove git -qq &>/dev/null
           fi
+
+          info "The lab enviornment has been completely removed."
      fi
 
      # Install Base then install labs.
