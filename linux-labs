@@ -21,6 +21,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+# TODO:
+# LAB01-01 - Student Install
+# LAB13-01 - (ssh) pg. 364-365
+# LAB17-01 - (lsmod)
+# LAB23-01 - Network Troubleshooting
+# LAB29-01 - Chroot on Apache Server
+
 # ##############################################################################
 # Virtual Machine Setup
 #
@@ -52,7 +59,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.13"
+g_VERSION="0.0.14"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -424,13 +431,15 @@ function update_notice ()
      l_VERSION=$(grep "^g_VERSION" "$l_TMP_FILE" | awk -F'[="]' '{print $3}')
 
      # Compare the script versions and notify if newer.
-     if [ "$g_VERSION" \< "$l_VERSION" ]; then
-          info "There is a new version v$l_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
-     else
-          info "You are running the current version of this script.\n\n"
+     if ! ((g_ARG_FINISH_INSTALL==1)); then
+          if [ "$g_VERSION" \< "$l_VERSION" ]; then
+               info "There is a new version v$l_VERSION of the $g_PROGRAM_NAME script available.\n         To upgrade please type \"$g_PROGRAM_NAME -u\" at the command prompt.\n\n"
+          else
+               info "You are running the current version of this script.\n\n"
 
-          if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
-               rm "${g_SCRIPT_PATH}/updater.sh"
+               if [[ -f "${g_SCRIPT_PATH}/updater.sh" ]]; then
+                    rm "${g_SCRIPT_PATH}/updater.sh"
+               fi
           fi
      fi
 
@@ -553,8 +562,9 @@ function base ()
      set +u
 
      # ADD USERS
+     info "  Creating lab users."
      if ! [ "`id -u labuser1 2>/dev/null`" ]; then
-          info "  Creating the labuser1 account."
+          info "    Creating the labuser1 account."
           useradd -c "Lab User 1" -m -s /bin/bash labuser1
           usermod -u 500 labuser1 &>/dev/null
           usermod -g labusers1 labuser1 &>/dev/null
@@ -562,28 +572,28 @@ function base ()
           usermod -a -G sudo labuser1 &>/dev/null
           echo "labuser1:${l_LABUSER_PASS}" | chpasswd
      else
-          warning "A previous lab enviornment may not have been cleaned up corretly."
+          warning "    A previous lab enviornment may not have been cleaned up corretly."
      fi
 
      if ! [ "`id -u labuser2 2>/dev/null`" ]; then
-          info "  Creating the labuser2 account."
+          info "    Creating the labuser2 account."
           useradd -c "Lab User 2" -m -s /bin/bash labuser2
           usermod -u 1002 labuser2 &>/dev/null
           usermod -g labusers2 labuser2 &>/dev/null
           echo "labuser2:${l_LABUSER_PASS}" | chpasswd
      else
-          warning "A previous lab enviornment may not have been cleaned up corretly."
+          warning "    A previous lab enviornment may not have been cleaned up corretly."
      fi
 
      if ! [ "`id -u labuser3 2>/dev/null`" ]; then
-          info "  Creating the labuser3 account."
+          info "    Creating the labuser3 account."
           useradd -c "Lab User 3" -m -s /bin/bash labuser3
           usermod -u 1003 labuser3 &>/dev/null
           usermod -g labusers1 labuser3 &>/dev/null
           usermod -a -G labusers2 labuser3 &>/dev/null
           echo "labuser3:${l_LABUSER_PASS}" | chpasswd
      else
-          warning "A previous lab enviornment may not have been cleaned up corretly."
+          warning "    A previous lab enviornment may not have been cleaned up corretly."
      fi
 
      # Reapply error trapping.
@@ -625,7 +635,7 @@ function base ()
 
      # Create script to move installation script to labs directory
      if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
-          info "Moving this script into the \"$g_LAB_PATH\" folder, please restart the\n         script from that location."
+          info "Moving the installation script then continuing the installation."
           printf '#!/bin/bash\n\n' >> install.sh
 
           if [ "$g_SCRIPT_PATH" == "/" ]; then
@@ -667,38 +677,40 @@ function chapter_1 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "S"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -720,38 +732,40 @@ function chapter_2 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -773,38 +787,40 @@ function chapter_3 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -826,38 +842,40 @@ function chapter_4 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -2155,7 +2173,7 @@ EOF
 
               info "  Setting the ownership and permissions for lab number: $l_LAB."
               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              chmod 754 "$l_WORKING_DIRECTORY/$l_LAB"
+              chmod 744 "$l_WORKING_DIRECTORY/$l_LAB"
               ;;
           -r)
               info "There is nothing to reset for lab: $l_LAB."
@@ -2229,43 +2247,49 @@ function chapter_9 ()
                #printf "People who boast about their I.Q. are losers." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
                ;;
           -i)
-              info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              info "  Creating the chapter: $l_CH_NUM directory."
-              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 $l_WORKING_DIRECTORY
-              chmod 02755 "$l_WORKING_DIRECTORY"
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               chown root:labusers1 "$l_WORKING_DIRECTORY"
+               chmod 00755 "$l_WORKING_DIRECTORY"
 
-              # CREATE LAB - SET PERMISSIONS
-              # Set the lab number variable LAB09-01.
-              l_LAB=$(create_lab $l_CH_NUM)
-              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               # CREATE LAB09-01 - SET PERMISSIONS
+               # Set the lab number variable LAB09-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-              # LAB09-01 - Constellations
-              mkdir -p "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
-              chown labuser1:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
-              chmod 00744 "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+               # LAB09-01 - Constellations
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB"
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB"
 
-              # Files
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/andromeda.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/antlia.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/apus.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aquila.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/ara.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aries.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/auriga.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/caelum.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/camelopardalis.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cancer.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/canes.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/'canis minor'.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/'canis major'.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/capricornus.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cassiopeia.txt"
-              chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/"
+              # Directory made here, permissions and ownership applied below.
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+
+               # CREATE FILES
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/andromeda.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/antlia.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/apus.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aquila.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/ara.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/aries.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/auriga.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/caelum.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/camelopardalis.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cancer.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/canes.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/canis minor.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/canis major.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/capricornus.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cassiopeia.txt"
+
+               # SET PERMISSIONS FOR FILES
+               chmod 00744 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/*"
+               chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/*"
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB" << EOF
 LAB:        LAB09-01
@@ -2306,63 +2330,65 @@ STICKY BITS
 # Dr. Matthew Kisow
 EOF
 
-              info "  Setting the ownership and permissions for lab number: $l_LAB."
-              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
 
-              # Set the lab number variable LAB09-02.
-              l_LAB=$(create_lab $l_CH_NUM 2)
-              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               # CREATE LAB09-02 - SET PERMISSIONS
+               # Set the lab number variable LAB09-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-              # LAB09-02 - Physicists
-              mkdir -p "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
-              chown labuser3:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
-              chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
+               # LAB09-02 - Physicists
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB"
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB"
 
-              # CREATE FILES
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/archimedes.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/bohr.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/cox.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/curie.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
+               # Directory made here, permissions and ownership applied below.
+               mkdir "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
 
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/faraday.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/feynman.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/galilei.txt"
-              printf "Intelligence is the ability to adapt to change." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
+               # CREATE FILES - SOME WITH QUOTES
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/archimedes.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/bohr.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/cox.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/curie.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/faraday.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/feynman.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/galilei.txt"
+               printf "Intelligence is the ability to adapt to change." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/kaku.txt"
+               printf "Falling Apple" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
+               printf "Now, I have become Death, the destroyer of worlds." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/pascal.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/raman.txt"
+               touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/tesla.txt"
 
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/kaku.txt"
-              printf "Falling Apple" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
+               # Create script to list all .txt files without extension.
+               printf '#!/bin/bash\n' >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
+               printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
 
-              printf "Now, I have become Death, the destroyer of worlds." >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
+               # SET PERMISSIONS FOR FOLDERS AND FILES
+               chown labuser3:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
+               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
 
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/pascal.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/raman.txt"
-              touch "$l_WORKING_DIRECTORY/$l_LAB/Physicists/tesla.txt"
+               chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/*"
+               chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/*"
 
-              # Create script to list all .txt files without extension.
-              printf '#!/bin/bash\n' >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
-              printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
+               # Einstein is editable by labuser3 then labuser2 after security change.
+               chmod 00640 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
 
-              # SET PERMISSIONS FOR FILES
-              chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
-              chmod 00750 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
-              chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/"
+               # Newton is editable by labuser3 and labuser2
+               chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
 
-              # Einstein is editable by labuser3 then labuser2 after security change.
-              chmod 640 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
+               # Hawking is only editable by labuser2
+               chmod 00600 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
+               chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
 
-              # Newton is editable by labuser3 and labuser2
-              chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/newton.txt"
+               # Oppenheimer is editable by labuser3 and labuser2
+               chown labuser2:labusers2 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
 
-              # Hawking is only editable by labuser2
-              chmod 00600 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
-              chown labuser2:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/hawking.txt"
-
-              # Oppenheimer is editable by labuser3 and labuser2
-              chown labuser2:labusers2 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
-
-              # CREATE LAB09-02 - SET PERMISSIONS
+               # CREATE LAB09-02 - SET PERMISSIONS
 cat > "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB" << EOF
 LAB:	       LAB09-02
 OBJECTIVE:  The objective of this lab is to learn how to set file permissions.
@@ -2431,9 +2457,10 @@ EXECUTABLE FLIES
 # Dr. Matthew Kisow
 EOF
 
-              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
-              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
-              ;;
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
+               ;;
           -r)
                # Set the lab number variable LAB09-01.
                l_LAB=$(create_lab $l_CH_NUM)
@@ -2466,38 +2493,40 @@ function chapter_10 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -2635,7 +2664,7 @@ EOF
      esac
 }
 
-#CH12 - User and Group Management - TODO: TEST
+#CH12 - User and Group Management
 function chapter_12 ()
 {
      local l_OPER="$1"
@@ -2871,8 +2900,12 @@ EOF
 
                mkdir "$l_WORKING_DIRECTORY/$l_LAB-Q"
                cp /etc/fstab{,.bak}
-               printf "# Disk/User Quota Lab: LAB12-02\n/dev/sdb1      /labs/CH12/LAB12-02-Q	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
+               printf "# Disk/User Quota Lab: LAB12-02-Q\n/dev/sdb1      /labs/CH12/LAB12-02-Q	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
                mount /labs/CH12/LAB12-02-Q
+
+               info "  Setting the ownership and permissions for lab number: $l_LAB quota directory."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB-Q"
+               chmod 02770 "$l_WORKING_DIRECTORY/$l_LAB-Q"
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB12-02
@@ -2932,7 +2965,7 @@ EOF
      esac
 }
 
-#CH13 - Account Security (No Labs) - TODO: LAB13-01 (ssh) pg. 364-365
+#CH13 - Account Security (No Labs)
 function chapter_13 ()
 {
      local l_OPER="$1"
@@ -2950,38 +2983,40 @@ function chapter_13 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3003,38 +3038,40 @@ function chapter_14 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3056,38 +3093,40 @@ function chapter_15 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3162,7 +3201,7 @@ function chapter_16 ()
 
               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
               chown root:labusers1 "$l_WORKING_DIRECTORY"
-              chmod 02744 "$l_WORKING_DIRECTORY"
+              chmod 02750 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
@@ -3234,38 +3273,40 @@ function chapter_17 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3438,21 +3479,21 @@ function chapter_19 ()
                #chmod 02770 /labs/CH19/LAB19-02
                ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "There is no lab available for this chapter."
+               #info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              info "  Creating the chapter: $l_CH_NUM directory."
-              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              chmod 02775 "$l_WORKING_DIRECTORY"
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               chmod 02775 "$l_WORKING_DIRECTORY"
 
-              # CREATE LAB - SET PERMISSIONS
-              # Set the lab number variable LAB19-01.
-              l_LAB=$(create_lab $l_CH_NUM)
-              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               # CREATE LAB - SET PERMISSIONS
+               # Set the lab number variable LAB19-01.
+               l_LAB=$(create_lab $l_CH_NUM)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
@@ -3496,14 +3537,14 @@ LOGICAL VOLUMES
 # Copyright © CC BY-NC-ND 4.0, (2022 – 2023)
 # Dr. Matthew Kisow
 EOF
-              info "  Setting the ownership and permissions for lab number: $l_LAB."
-              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
 
-              # CREATE LAB - SET PERMISSIONS
-              # Set the lab number variable LAB19-02.
-              l_LAB=$(create_lab $l_CH_NUM 2)
-              info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               # CREATE LAB - SET PERMISSIONS
+               # Set the lab number variable LAB19-02.
+               l_LAB=$(create_lab $l_CH_NUM 2)
+               info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB19-02
@@ -3529,10 +3570,10 @@ RAID VOLUME
 # Dr. Matthew Kisow
 
 EOF
-              info "  Setting the ownership and permissions for lab number: $l_LAB."
-              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
                # Set the lab number variable LAB09-01.
                l_LAB=$(create_lab $l_CH_NUM)
@@ -3580,38 +3621,40 @@ function chapter_20 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3633,38 +3676,40 @@ function chapter_21 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3701,17 +3746,17 @@ function chapter_22 ()
               #iptables -D INPUT -p icmp -j DROP
               ;;
           -i)
-              info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              info "  Creating the chapter: $l_CH_NUM directory."
-              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               # SET SECURITY
+               info "  Creating the chapter: $l_CH_NUM directory."
+               l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              chmod 02770 "$l_WORKING_DIRECTORY"
+               info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               chmod 02770 "$l_WORKING_DIRECTORY"
 
-              # CREATE LAB - SET PERMISSIONS
+               # CREATE LAB - SET PERMISSIONS
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB22-01
@@ -3760,38 +3805,40 @@ function chapter_23 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -3835,7 +3882,7 @@ function chapter_24 ()
 
                info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
                #chown root:labusers1 "$l_WORKING_DIRECTORY"
-               chmod 02775 "$l_WORKING_DIRECTORY"
+               chmod 02770 "$l_WORKING_DIRECTORY"
 
                # CREATE LAB - SET PERMISSIONS
                info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
@@ -4224,38 +4271,40 @@ function chapter_28 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -4277,38 +4326,40 @@ function chapter_29 ()
 
      case "$l_OPER" in
           -c)
-              info "There is no lab to roll forward for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no lab to roll forward for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -g)
-              info "There is no grading module available for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is no grading module available for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
           -i)
-              info "There is no lab available for this chapter."
-              #info "Setting up the labs for chapter: $l_CH_NUM."
+               info "Setting up the labs for chapter: $l_CH_NUM."
 
-              # SET SECURITY
-              #info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+               info "  There are no labs available for this chapter."
+               #info "  Setting up the labs for chapter: $l_CH_NUM."
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY"
-              #chmod 02754 "$l_WORKING_DIRECTORY"
+               # SET SECURITY
+               #info "  Creating the chapter: $l_CH_NUM directory."
+               #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+               #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY"
+               #chmod 02754 "$l_WORKING_DIRECTORY"
+
+               # CREATE LAB - SET PERMISSIONS
+               #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 #cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 #EOF
-              #info "  Setting the ownership and permissions for lab number: $l_LAB."
-              #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               #info "  Setting the ownership and permissions for lab number: $l_LAB."
+               #chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               #chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "There is nothing to reset for lab: $l_LAB."
-              cleanup_and_exit_with_code 1
-              ;;
+               info "There is nothing to reset for lab: $l_LAB."
+               cleanup_and_exit_with_code 1
+               ;;
      esac
 }
 
@@ -4346,7 +4397,7 @@ if ((g_ARG_INSTALL==1)); then
      if ! ((g_ARG_FINISH_INSTALL==1)); then
           info "Starting installation of the lab enviornment."
      else
-          info "Finishing the installation of the lab enviornment."
+          info "Continuing the installation of the lab enviornment."
      fi
 
      # Is this linux a supported device? If not, error and quit.
@@ -4450,7 +4501,9 @@ if ((g_ARG_INSTALL==1)); then
      fi
 
      # Install Base then install labs.
-     base
+     if ! ((g_ARG_FINISH_INSTALL==1)); then
+          base
+     fi
 
      # Loop through the chapters, setting up each lab.
      for i in {1..29}; do
