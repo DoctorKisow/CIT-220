@@ -52,7 +52,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.12"
+g_VERSION="0.0.13"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -112,7 +112,6 @@ declare g_INSTALL_DATE=""
 # (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
 function script_banner ()
 {
-     clear
      printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
      printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
      printf -- "--------------------------------------------------------------------------------\n"
@@ -168,6 +167,9 @@ trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
 # (print_usage) - Function used to display the scripts usage and command line options.
 function print_usage ()
 {
+  clear
+  script_banner
+
   cat << EOF
 
   Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
@@ -193,6 +195,9 @@ function help ()
 # (print_version) - Function used to print the script version.
 function print_version ()
 {
+     clear
+     script_banner
+
      printf "%s\n" "${g_VERSION}"
 }
 
@@ -3700,14 +3705,13 @@ function chapter_22 ()
 
               # SET SECURITY
               info "  Creating the chapter: $l_CH_NUM directory."
-              #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+              l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-              #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+              info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
               #chown root:labusers1 "$l_WORKING_DIRECTORY"
               chmod 02770 "$l_WORKING_DIRECTORY"
 
               # CREATE LAB - SET PERMISSIONS
-              #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB22-01
@@ -3839,7 +3843,7 @@ function chapter_24 ()
                # Create a script to display a message.
                printf '#!/bin/sh' >> "$l_WORKING_DIRECTORY/lab2401.sh"
                printf "wall \"It's time to stop working on these labs.\"\n" >> "$l_WORKING_DIRECTORY/lab2401.sh"
-               chown labuser1:labusers "$l_WORKING_DIRECTORY/lab2401.sh"
+               chown labuser1:labusers1 "$l_WORKING_DIRECTORY/lab2401.sh"
                chmod 770 "$l_WORKING_DIRECTORY/lab2401.sh"
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
@@ -4135,7 +4139,7 @@ function chapter_27 ()
 
               #SETUP GIT - CLONE lsRules
               cd "$l_WORKING_DIRECTORY"
-              git clone https://github.com/DoctorKisow/lsRules.git
+              git clone https://github.com/DoctorKisow/lsRules.git &>/dev/null
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB" << EOF
 LAB:	       LAB27-01
@@ -4309,14 +4313,21 @@ function chapter_29 ()
 }
 
 # *************************** begin of script proper ***************************
-script_banner
 process_command_line_options "${@}"
 internal_consistency_option_checks
 
+# Only clear screen and present script banner when GAFI is zero.
+if ! ((g_ARG_FINISH_INSTALL==1)); then
+     clear
+     script_banner
+fi
+
+# Update Notice
 if ((g_ARG_UPDATE==0)); then
      update_notice
 fi
 
+# Process Options
 if ((g_ARG_CHANGE_LAB==1)); then
      if [ $EUID -ne 1000 ]; then
           warning "This option can only be run by your instructor."
