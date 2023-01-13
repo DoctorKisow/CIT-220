@@ -23,6 +23,7 @@
 
 # TODO:
 # LAB01-01 - Student Install
+# LAB07-01 - GRADING AND RESET
 # LAB13-01 - (ssh) pg. 364-365
 # LAB17-01 - (lsmod)
 # LAB23-01 - Network Troubleshooting
@@ -1201,7 +1202,7 @@ EOF
      esac
 }
 
-# CH07 - File Manipulation - TODO: GRADING, RESET
+# CH07 - File Manipulation
 function chapter_7 ()
 {
      local l_OPER="$1"
@@ -2255,19 +2256,19 @@ function chapter_9 ()
 
                info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
                chown root:labusers1 "$l_WORKING_DIRECTORY"
-               chmod 00755 "$l_WORKING_DIRECTORY"
+               chmod 02755 "$l_WORKING_DIRECTORY"
 
                # CREATE LAB09-01 - SET PERMISSIONS
                # Set the lab number variable LAB09-01.
                l_LAB=$(create_lab $l_CH_NUM)
                info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-               # LAB09-01 - Constellations
+               # CREATE LAB DIRECTORY - SET PERMISSIONS
                mkdir "$l_WORKING_DIRECTORY/$l_LAB"
                chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 02755 "$l_WORKING_DIRECTORY/$l_LAB"
 
-              # Directory made here, permissions and ownership applied below.
+               # Directory made here, permissions and ownership applied below.
                mkdir "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
 
                # CREATE FILES
@@ -2288,8 +2289,9 @@ function chapter_9 ()
                touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cassiopeia.txt"
 
                # SET PERMISSIONS FOR FILES
-               chmod 00744 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/*"
-               chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations/*"
+               chmod 00644 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
+               chmod 00744 "$l_WORKING_DIRECTORY/$l_LAB/Constellations/."
+               chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
 
 cat > "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB" << EOF
 LAB:        LAB09-01
@@ -2331,18 +2333,18 @@ STICKY BITS
 EOF
 
                info "  Setting the ownership and permissions for lab number: $l_LAB."
-               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB/$l_LAB"
 
                # CREATE LAB09-02 - SET PERMISSIONS
                # Set the lab number variable LAB09-02.
                l_LAB=$(create_lab $l_CH_NUM 2)
                info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
-               # LAB09-02 - Physicists
+               # CREATE LAB DIRECTORY - SET PERMISSIONS
                mkdir "$l_WORKING_DIRECTORY/$l_LAB"
                chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 02755 "$l_WORKING_DIRECTORY/$l_LAB"
 
                # Directory made here, permissions and ownership applied below.
                mkdir "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
@@ -2369,11 +2371,9 @@ EOF
                printf "ls -1 *.txt | sed -e 's/\.txt$//'" >> "$l_WORKING_DIRECTORY/$l_LAB/Physicists/physicists-list"
 
                # SET PERMISSIONS FOR FOLDERS AND FILES
-               chown labuser3:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
-               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
-
-               chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/*"
-               chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists/*"
+               chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
+               chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/."
+               chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
 
                # Einstein is editable by labuser3 then labuser2 after security change.
                chmod 00640 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/einstein.txt"
