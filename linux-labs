@@ -990,15 +990,15 @@ function chapter_5 ()
                    a.	What did you observe?
                EOF
 
-              info "  Setting the ownership and permissions for lab number: $l_LAB."
-              chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-              chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
-              ;;
+               info "  Setting the ownership and permissions for lab number: $l_LAB."
+               chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
+               chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
+               ;;
           -r)
-              info "Resetting lab: $l_LAB."
-              backup_lab $l_LAB
-              chapter_5 -i 5
-              ;;
+               info "Resetting lab: $l_LAB."
+               backup_lab $l_LAB
+               chapter_5 -i 5
+               ;;
      esac
 }
 
