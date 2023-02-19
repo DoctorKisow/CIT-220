@@ -23,7 +23,7 @@
 
 # TODO:
 # LAB01-01 - Student Install
-# LAB07-01 - GRADING AND RESET
+# LAB07-01 - GRADING
 # LAB13-01 - (ssh) pg. 364-365
 # LAB17-01 - (lsmod)
 # LAB23-01 - Network Troubleshooting
@@ -32,18 +32,31 @@
 # ##############################################################################
 # Virtual Machine Setup
 #
-# SCSI1: 15Gb     /dev/sda1               715   Mb   /boot/efi
-#                 /dev/sda2                 1.8 Gb   /boot
-#                 /dev/sda3                12.5 Gb
-#                 |-ubuntu--vg-ubuntu-lvm  10   Gb   /
+# SCSI1: 160Gb    sda             8:0    0   160G  0 disk 
+#                 ├─sda1          8:1    0     1M  0 part  (BIOS OFFSET)
+#                 ├─sda2          8:2    0    30G  0 part  /
+#                 ├─sda3          8:3    0    15G  0 part  /tmp
+#                 ├─sda4          8:4    0   1.5G  0 part  /boot
+#                 ├─sda5          8:5    0   512M  0 part  /boot/efi
+#                 ├─sda6          8:6    0    30G  0 part  /home
+#                 ├─sda7          8:7    0    15G  0 part  /usr
+#                 ├─sda8          8:8    0    30G  0 part  /var
+#                 └─sda9          8:9    0     4G  0 part  [SWAP]
 #
-# SCSI2: 128Mb    /dev/sdb1                          /Lab Files/CH12
-# SCSI3: 128Mb    LAB18-01
-# SCSI4: 128Mb    LAB19-01      LVM
-# SCSI5: 128Mb    LAB19-01      LVM
-# SCSI6: 128Mb    LAB19-02      RAID
-# SCSI7: 128Mb    LAB19-02      RAID
-# SCSI8: 128Mb    LAB19-02      RAID
+#                 sdb             8:16   0   128M  0 disk 
+#                 └─sdb1          8:17   0   127M  0 part  /labs/CH12/LAB12-02-Q
+#                 sdc             8:32   0   128M  0 disk 
+#                 └─sdc1          8:33   0   127M  0 disk  /labs/CH18/LAB18-01
+#                 sdd             8:48   0   128M  0 disk 
+#                 └─vg1-CIT220  253:0    0   248M  0 lvm   /labs/CH19/LAB19-01
+#                 sde             8:64   0   128M  0 disk 
+#                 └─vg1-CIT220  253:1    0   248M  0 lvm   /labs/CH19/LAB19-01
+#                 sdf             8:80   0   128M  0 disk
+#                 └─md0           9:0    0   252M  0 raid5 /labs/CH19/LAB19-02
+#                 sdg             8:96   0   128M  0 disk
+#                 └─md0           9:0    0   252M  0 raid5 /labs/CH19/LAB19-02
+#                 sdh             8:112  0   128M  0 disk
+#                 └─md0           9:0    0   252M  0 raid5 /labs/CH19/LAB19-02
 # ##############################################################################
 
 # Scroll to the bottom of this script to follow the main script flow.
@@ -60,7 +73,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.17"
+g_VERSION="0.0.18"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -181,7 +194,7 @@ function print_usage ()
 	cat << EOF
 
   Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
-					   [-u|--update] [-v]
+                    [-u|--update] [-v]
   Options:
 	-c                     roll the enviornment forward to a lab [1-29]
 	-g                     grade a completed lab [1-29]
@@ -434,8 +447,11 @@ function test_user ()
 	local l_USER="$1"
 
 	if id -u "$l_USER" >/dev/null 2>&1; then
-		userdel "$l_USER"
-		rm -r -f "/home/$l_USER"
+		userdel -r -f "$l_USER" >> /dev/null 2>&1
+	fi
+
+	if [ $(getent group $l_USER) ]; then
+		groupdel $l_USER
 	fi
 }
 
@@ -539,14 +555,14 @@ function backup_lab ()
 # *************************** script specific functions ************************
 
 # ##############################################################################
-# SYSTEM BASE - Setup system for the rest of the labs. - TODO: TEST SCRIPT MOVE
+# SYSTEM BASE - Setup system for the rest of the labs.
 function base ()
 {
 	local l_LABUSER_PASS="P@\$\$w0rd"
 
 	# Ensure we have the necessary block devices available.
 	if [ $(lsblk | grep -o "^sd[a-z]" | wc -l) -ne 8 ]; then
-		error "You do not have  enough block device  available to complete the  labs. LAB12-02, \nLAB18-01,  LAB19-01  and  LAB19-02  require  these  block  devices  to  be  made \navailable. Please add these  block devices before continuing  with installation.\n\nFor information  on how to add these  devices,  please contact your  instructor.\n"
+		error "You do not have enough block devices available to complete the labs. LAB12-02, \nLAB18-01, LAB19-01 and LAB19-02 require these block devices to be made \navailable. Please add these block devices before continuing with installation.\n\nFor information on how to add these devices, please contact your instructor.\n"
 	fi
 
 	info "Installing the base lab enviornment."
@@ -588,16 +604,36 @@ function base ()
 	info "    Installing the git package(s)."
 	apt -y install git -qq &>/dev/null
 
+	# BACKUP THE FILESYSTEM TABLE
+	cp -f /etc/fstab{,.bak}
+
 	# ADD GROUPS
 	info "  Creating security groups."
-	if ! [ $(getent group labuser1) ]; then
+
+	info "    Creating the labusers1 group."
+	if ! [ $(getent group labusers1) ]; then
 		groupadd -g 1001 labusers1
 	else
 		warning "A previous lab enviornment may not have been cleaned up corretly."
 	fi
 
-	if ! [ $(getent group labuser2) ]; then
+	info "    Creating the labusers2 group."
+	if ! [ $(getent group labusers2) ]; then
 		groupadd -g 1002 labusers2
+	else
+		warning "A previous lab enviornment may not have been cleaned up corretly."
+	fi
+
+	info "    Creating the labusers3 group."
+	if ! [ $(getent group labusers3) ]; then
+		groupadd -g 1003 labusers3
+	else
+		warning "A previous lab enviornment may not have been cleaned up corretly."
+	fi
+
+	info "    Creating the labusers9 group."
+	if ! [ $(getent group labusers9) ]; then
+		groupadd -g 509 labusers9
 	else
 		warning "A previous lab enviornment may not have been cleaned up corretly."
 	fi
@@ -606,37 +642,54 @@ function base ()
 	set +e
 	set +u
 
+	# UID 500 - mkisowa
+
+	#if ! [ "`id -u ccacits 2>/dev/null`" ]; then
+	#	useradd -c "CCAC ITS" -m -s /bin/bash ccacits
+	#	usermod -u 510 ccacits &>/dev/null
+	#	usermod -g ccacits ccacits &>/dev/null
+	#	groupmod -g 510 ccacits
+	#	chown ccacits:ccacits /home/ccacits
+	#	echo 'ccacits:2T$qj3Dd7aO1bQiZ' | chpasswd
+	#fi
+
 	# ADD USERS
 	info "  Creating lab users."
+	info "    Creating the labuser1 account."
 	if ! [ "`id -u labuser1 2>/dev/null`" ]; then
-		info "    Creating the labuser1 account."
-		useradd -c "Lab User 1" -m -s /bin/bash labuser1
-		usermod -u 500 labuser1 &>/dev/null
+		useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
 		usermod -g labusers1 labuser1 &>/dev/null
-		usermod -a -G labusers2 labuser1 &>/dev/null
-		usermod -a -G sudo labuser1 &>/dev/null
-		echo "labuser1:${l_LABUSER_PASS}" | chpasswd
+		chown labuser1:labusers1 /home/labuser1
+		echo 'labuser1:P@$$w0rd' | chpasswd
 	else
 		warning "    A previous lab enviornment may not have been cleaned up corretly."
 	fi
 
+	info "    Creating the labuser2 account."
 	if ! [ "`id -u labuser2 2>/dev/null`" ]; then
-		info "    Creating the labuser2 account."
-		useradd -c "Lab User 2" -m -s /bin/bash labuser2
-		usermod -u 1002 labuser2 &>/dev/null
-		usermod -g labusers2 labuser2 &>/dev/null
-		echo "labuser2:${l_LABUSER_PASS}" | chpasswd
+		useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
+		chown labuser2:labusers2 /home/labuser2
+		echo 'labuser2:P@$$w0rd' | chpasswd
 	else
 		warning "    A previous lab enviornment may not have been cleaned up corretly."
 	fi
 
+	info "    Creating the labuser3 account."
 	if ! [ "`id -u labuser3 2>/dev/null`" ]; then
-		info "    Creating the labuser3 account."
-		useradd -c "Lab User 3" -m -s /bin/bash labuser3
-		usermod -u 1003 labuser3 &>/dev/null
-		usermod -g labusers1 labuser3 &>/dev/null
-		usermod -a -G labusers2 labuser3 &>/dev/null
-		echo "labuser3:${l_LABUSER_PASS}" | chpasswd
+		useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
+		chown labuser3:labusers3 /home/labuser3
+		echo 'labuser3:P@$$w0rd' | chpasswd
+	else
+		warning "    A previous lab enviornment may not have been cleaned up corretly."
+	fi
+
+	info "    Creating the labuser9 account."
+	if ! [ "`id -u labuser9 2>/dev/null`" ]; then
+		useradd --comment "Lab User 9" --uid 509 --create-home --no-user-group --gid 509 --shell /bin/bash labuser9
+		chown labuser9:labusers9 /home/labuser9
+		echo 'labuser9:P@$$w0rd' | chpasswd
+
+		sed -i '/# User privilege specification/ a labuser9 ALL=(root) NOPASSWD: /bin/systemctl enable ssh, /bin/systemctl disable ssh, /bin/systemctl reload ssh, /bin/systemctl start ssh, /bin/systemctl stop ssh' /etc/sudoers
 	else
 		warning "    A previous lab enviornment may not have been cleaned up corretly."
 	fi
@@ -660,11 +713,6 @@ function base ()
 	info "  Setting the ownership and permissions for the lab enviornment."
 	chown root:labusers1 "$g_LAB_PATH"
 	chmod 02755 "$g_LAB_PATH"
-
-	# DISABLE SSH (CH05 LAB)
-	info "  Disabling the ssh service."
-	systemctl disable ssh.service &>/dev/null
-	systemctl stop ssh.service &>/dev/null
 
 	# Set a sourceable file that lists the install date.
 	info "  Creating installation timestamp file."
@@ -698,13 +746,13 @@ function base ()
 		fi
 
 		chmod 750 "$g_SCRIPT_PATH/install.sh"
-		chown mkisowa:labuser1 "$g_SCRIPT_PATH/install.sh"
+		chown mkisowa:labusers1 "$g_SCRIPT_PATH/install.sh"
 		exec /bin/bash "$g_SCRIPT_PATH/install.sh"
 	fi
 }
 
 # CHAPTER - Name of Chapter - Passed arguements ($1) the operation are we performing, ($2) the chapter/lab number.
-# CH01 - Installing (No Labs) - TODO: Student Install
+# CH01 - Installing (No Labs)
 function chapter_1 ()
 {
 	local l_OPER="$1"
@@ -984,12 +1032,9 @@ function chapter_5 ()
 			#chown root:labusers1 "$l_WORKING_DIRECTORY"
 			chmod 00750 "$l_WORKING_DIRECTORY"
 
-			#ADD labuser1 to /etc/sudoers
-			#sed -i '/# User privilege specification/ a labuser1 ALL=(root) NOPASSWD: /bin/systemctl enable ssh, /bin/systemctl disable ssh, /bin/systemctl reload ssh, /bin/systemctl start ssh, /bin/systemctl stop ssh' /etc/sudoers
-
 			# Disable SSH
 			info "  Stopping the SSH service."
-			systemctl stop ssh systemctl disable ssh 2>/dev/null
+			systemctl stop ssh 2>/dev/null
 			info "  Disabling the SSH service."
 			systemctl disable ssh 2>/dev/null
 			#warning "  The SSH service could be in an unclean state and the system should be rebooted."
@@ -1367,7 +1412,7 @@ function chapter_7 ()
 			l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
 			info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-			chown labuser1:labusers1 $l_WORKING_DIRECTORY
+			chown labuser1:labusers1 "$l_WORKING_DIRECTORY"
 			chmod 02774 "$l_WORKING_DIRECTORY"
 
 			# CREATE LAB - SET PERMISSIONS
@@ -1640,7 +1685,7 @@ function chapter_8 ()
 
 			# Apply crontab entry for hwsnbn.sh.
 			info "   Applying new hwsnbn.sh entry to crontab."
-			sed "`wc -l < /etc/crontab` i 1  *    * * *   root    /labs/CH08/hwsnbn.sh" /etc/crontab
+			sed -i "`wc -l < /etc/crontab` i 1  *    * * *   root    /labs/CH08/hwsnbn.sh" /etc/crontab
 
 			# frankenstein letter
 			cat > "$l_WORKING_DIRECTORY/frankenstein-letter.txt" <<-EOF
@@ -2988,8 +3033,10 @@ function chapter_12 ()
 			test_group labuser5
 
 			# Cleanup residue left from previous labs if it exists.
-			info "  Turning off disk quota for /dev/sdb1."
-			quotaoff "/Lab Files/CH12/LAB12-02-Q"
+			if [[ $(mount | grep "$l_WORKING_DIRECTORY/$l_LAB-Q") ]]; then
+				info "  Turning off disk quota for /dev/sdb1."
+				quotaoff "/Lab Files/CH12/LAB12-02-Q"
+			fi
 
 			if [[ $(mount | grep "$l_WORKING_DIRECTORY/$l_LAB-Q") ]]; then
 				info "  Unmounting the quota disk /dev/sdb1"
@@ -3012,7 +3059,6 @@ function chapter_12 ()
 			mkfs.ext4 /dev/sdb1 >> /dev/null 2>&1
 
 			mkdir "$l_WORKING_DIRECTORY/$l_LAB-Q"
-			cp -f /etc/fstab{,.bak}
 			printf "# Disk/User Quota Lab: LAB12-02-Q\n/dev/sdb1      /labs/CH12/LAB12-02-Q	ext4	defaults,usrquota,grpquota 0 0\n" >> /etc/fstab
 			mount /labs/CH12/LAB12-02-Q
 
@@ -3290,6 +3336,7 @@ function chapter_16 ()
 
 			#6
 			#swapon -s
+			#swapoff /swap.img
 
 			#7
 			#cat /proc/ioports
@@ -3339,6 +3386,7 @@ function chapter_16 ()
 			5.  Get a detailed usage of your memory.
 			6.  List the currently active memory page file.
 				a.	Is it an actual file or a partition?
+				b.  Disable the swap.img file.
 
 			PHYSICAL DEVICES
 			7.  List all communication ports open to the processor.
@@ -3502,8 +3550,8 @@ function chapter_18 ()
 			sed -i -e '/# Disk Lab: LAB18-01/d' /etc/fstab
 			sed -i -e '/\/dev\/sdc1/d' /etc/fstab
 
-			#Setup Quota Disk
-			wipefs /dev/sdb --all --force --quiet
+			# Wipe /dev/sdv
+			wipefs /dev/sdc --all --force --quiet
 
 			cat > "$l_WORKING_DIRECTORY/$l_LAB" <<-EOF
 			LAB:	LAB18-01
@@ -3605,6 +3653,7 @@ function chapter_19 ()
 			#mkfs.ext4 -F -m 0 -L "CIT220-LVM" /dev/vg1/CIT220
 
 			#9
+			# mkdir /labs/CH19/LAB19-01
 			#printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01 ext4 defaults  0    0\n" >> /etc/fstab
 
 			#10
@@ -3624,9 +3673,10 @@ function chapter_19 ()
 			#more /proc/mdstat
 
 			#3
-			#mkfs.ext4 -F -m 0 -L "CIT220-RAID" /dev/md0
+			#mkfs.ext4 /dev/md0 
 
 			#4
+			#mkdir /labs/CH19/LAB19-02
 			#printf "/dev/md0 /labs/CH19/LAB19-02 ext4 defaults  0    0\n" >> /etc/fstab
 
 			#5
@@ -3663,7 +3713,7 @@ function chapter_19 ()
 			sed -i -e '/# Volume Group Lab: LAB19-01/d' /etc/fstab
 			sed -i -e '/\/dev\/mapper\/vg1-CIT220/d' /etc/fstab
 
-			if [ -f /dev/mapper/vg1-CIT220 ]; then
+			if [ -b /dev/mapper/vg1-CIT220 ]; then
 				info "  Removing Volume Group."
 
 				vgchange -a n vg1 >> /dev/null 2>&1
@@ -3744,7 +3794,7 @@ function chapter_19 ()
 				sed -i -e '/\/dev\/md0/d' /etc/fstab
 
 				info "  Stopping RAID volume /dev/md0"
-				mdamm --stop /dev/md0
+				mdadm --stop /dev/md0
 
 				info "  Resetting disks."
 				wipefs /dev/sdf --all --force --quiet
@@ -4638,7 +4688,7 @@ if ((g_ARG_INSTALL==1)); then
 	fi
 
 	# Are we being run by an instructor, if yes run it.
-	#if [ $EUID -ne 1000 ]; then
+	#if [ $EUID -ne 500 ]; then
 	if [ $EUID -ne 0 ]; then
 		warning "This option can only be run by your instructor."
 		cleanup_and_exit_with_code 1
@@ -4649,81 +4699,175 @@ if ((g_ARG_INSTALL==1)); then
 			printf "The install date of this lab was on: $g_INSTALL_DATE\n"
 
 			read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
+			printf "\n\n"
+
 			if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
-					info "Completely removing the lab enviornment."
-					info "  Removing the directory and symlink."
-					if [[ -d "$g_LAB_PATH" ]]; then
-						rm -r "$g_LAB_PATH"
+				info "Completely removing the lab enviornment."
+
+				# Restore /etc/fstab created during base install.
+				info "  Restoring the /etc/fstab file."
+				if [ -f /etc/fstab.bak ]; then
+					mv /etc/fstab{.bak,} &>/dev/null
+				else
+					warning "    The backup copy of the filesystem table no longer exists."
+				fi
+
+				# Remove the lab user(s).
+				info "  Removing users and their home directories."
+				if id -u "labuser1" >/dev/null 2>&1; then
+					if [ $(id -nG labuser1 | grep -qw sudo) ]; then
+						info "    Removing labuser1 from the sudo group."
+						gpasswd --delete labuser1 sudo >> /dev/null 2>&1
+					fi
+				fi
+
+				test_user labuser1
+				test_user labuser2
+				test_user labuser3
+				test_user labuser9
+
+				# Remove the lab security group(s).
+				info "  Removing security groups."
+				test_group labusers1
+				test_group labusers2
+				test_group labusers3
+				test_group labusers9
+				sed -i -e '/labuser9 ALL=(root) NOPASSWD: \/bin\/systemctl enable ssh, \/bin\/systemctl disable ssh, \/bin\/systemctl reload ssh, \/bin\/systemctl start ssh, \/bin\/systemctl stop ssh/d' /etc/sudoers
+
+				# Chapter 5 (Disable SSH)
+				info "  Stopping the SSH service."
+				systemctl stop ssh 2>/dev/null
+
+				info "  Disabling the SSH service."
+				systemctl disable ssh 2>/dev/null
+
+				# Chapter 8 (Remove hwsnbn.sh)
+				info "    Cleaning up the /etc/crontab table."
+				sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
+
+				# Chapter 12 (Remove Users)
+				test_user labuser4
+				test_group finance
+				test_user labuser5
+				test_group labusers5
+
+				# Chapter 12 (Unmount Disk)
+				if $(mount | grep -qw /dev/sdb1); then
+					info "  Unmounting the quota disk /dev/sdb1"
+					umount --lazy /dev/sdb1
+				fi
+
+				# Chapter 12 (Wipe Disk)
+				info "  Resetting disk(s)."
+				wipefs /dev/sdb --all --force --quiet
+
+				# Chapter 18 (Unmount Disk)
+				if $(mount | grep -qw /dev/sdc1); then
+					info "  Unmounting the disk /dev/sdc1"
+					umount --lazy /dev/sdc1
+				fi
+
+				# Chapter 18 (Wipe Disk)
+				info "  Resetting disk(s)."
+				wipefs /dev/sdc --all --force --quiet
+
+				# Chapter 19 (Unmount Disk)
+				if $(mount | grep -qw /dev/mapper/vg1-CIT220); then
+					info "  Unmounting the volume group /dev/mapper/vg1-CIT220"
+					umount --lazy /dev/mapper/vg1-CIT220
+				fi
+
+				# Chapter 19 (Cleanup Volume Group)
+				if [ -b /dev/mapper/vg1-CIT220 ]; then
+					info "  Removing Volume Group."
+
+					vgchange -a n vg1 >> /dev/null 2>&1
+					lvremove /dev/vg1/CIT220 >> /dev/null 2>&1
+					vgremove vg1 >> /dev/null 2>&1
+					pvremove /dev/sdd >> /dev/null 2>&1
+					pvremove /dev/sde >> /dev/null 2>&1
+				fi
+
+				# Chapter 19 (Wipe Disk)
+				info "  Resetting disk(s)."
+				wipefs /dev/sdd --all --force --quiet
+				wipefs /dev/sde --all --force --quiet
+
+				# Chapter 19 (Cleanup RAID)
+				if [ -b /dev/md0 ]; then
+					if $(mount | grep -qw /dev/md0); then
+						info "  Unmounting the RAID volume /dev/md0"
+						umount --lazy /dev/md0
 					fi
 
-					if [[ -h "$g_LAB_SYMLINK" ]]; then
-						rm -r "$g_LAB_SYMLINK"
-					fi
+					info "  Stopping RAID volume /dev/md0"
+					mdadm --stop /dev/md0
 
-					info "  Removing users and their home directories."
-					gpasswd --delete labuser1 sudo
-					test_user labuser1
-					test_user labuser2
-					test_user labuser3
-					test_user labuser4
-					test_user labuser5
+					info "  Resetting disk(s)."
+					wipefs /dev/sdf --all --force --quiet
+					sgdisk --zap /dev/sdf >> /dev/nul
 
-					info "  Removing security groups."
-					test_group labusers1
-					test_group labusers2
+					wipefs /dev/sdg --all --force --quiet
+					sgdisk --zap /dev/sdg >> /dev/nul
 
-					# Chapter 8 (Remove hwsnbn.sh)
-					sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
+					wipefs /dev/sdh --all --force --quiet
+					sgdisk --zap /dev/sdh >> /dev/nul
+				fi
 
-					# Chapter 12 (Remove Quotas, Restore /etc/fstab)
-					quotaoff "/Lab Files/CH12/LAB12-02-Q"
-					umount "/Lab Files/CH12/LAB12-02-Q/"
-					rm "/Lab Files/CH12/LAB12-02-Q/*"
+				# Chapter 22 (Reset Firewall)
+				info "  Resetting ipTables."
+				iptables -F
 
-					# Restore /etc/fstab created when labs were installed.
-					if [ -f /etc/fstab.bak ]; then
-						info "  Restoring the /etc/fstab file."
-						mv /etc/fstab{.bak,} &>/dev/null
-					else
-						warning "The backup copy of the filesystem table no longer exists."
-					fi
+				# Chapter 25 (Reset LOCALE)
+				ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime 
 
-					info "Removing installed packages."
-					#CH06 (ifconfig)
-					info "   Removing the net-tools package(s)."
-					apt -y remove net-tools -qq &>/dev/null
-					#CH06 (lynx browser)
-					info "   Removing the lynx package(s)."
-					apt -y remove lynx -qq &>/dev/null
-					#CH07
-					info "   Removing the tree package(s)."
-					apt -y remove tree -qq &>/dev/null
-					#CH09
-					info "   Removing the acl package(s)."
-					apt -y remove acl -qq &>/dev/null
-					#CH11
-					info "   Removing the zip package(s)."
-					apt -y remove zip -qq &>/dev/null
-					#CH12
-					info "   Removing the quota package(s)."
-					apt -y remove quota -qq &>/dev/null
-					#CH16
-					info "   Removing the sysstat package(s)."
-					apt -y remove sysstat -qq &>/dev/null
-					info "   Removing the procinfo package(s)."
-					apt -y remove procinfo -qq &>/dev/null
-					#CH20
-					info "   Removing the network-managerpackage(s)."
-					apt -y remove network-manager -qq &>/dev/null
-					#CH21
-					info "   Removing the whois package(s)."
-					apt -y remove whois -qq &>/dev/null
-					#CH23
-					info "   Removing the at package(s)."
-					apt -y remove at -qq &>/dev/null
-					#CH27
-					info "   Removing the git package(s)."
-					apt -y remove git -qq &>/dev/null
+				# Remove lab directory.
+				if [[ -d "$g_LAB_PATH" ]]; then
+					info "  Removing the lab directory."
+					rm -r "$g_LAB_PATH"
+				fi
+
+				# Remove lab symbolic link.
+				if [[ -h "$g_LAB_SYMLINK" ]]; then
+					info "  Removing the lab symbolic link."
+					rm -r "$g_LAB_SYMLINK"
+				fi
+
+				info "Removing installed packages."
+				#CH06
+				info "  Removing the net-tools package(s)."
+				apt -y remove net-tools -qq &>/dev/null
+				info "  Removing the lynx package(s)."
+				apt -y remove lynx -qq &>/dev/null
+				#CH07
+				info "  Removing the tree package(s)."
+				apt -y remove tree -qq &>/dev/null
+				#CH09
+				info "  Removing the acl package(s)."
+				apt -y remove acl -qq &>/dev/null
+				#CH11
+				info "  Removing the zip package(s)."
+				apt -y remove zip -qq &>/dev/null
+				#CH12
+				info "  Removing the quota package(s)."
+				apt -y remove quota -qq &>/dev/null
+				#CH16
+				info "  Removing the sysstat package(s)."
+				apt -y remove sysstat -qq &>/dev/null
+				info "  Removing the procinfo package(s)."
+				apt -y remove procinfo -qq &>/dev/null
+				#CH20
+				info "  Removing the network-manager package(s)."
+				apt -y remove network-manager -qq &>/dev/null
+				#CH21
+				info "  Removing the whois package(s)."
+				apt -y remove whois -qq &>/dev/null
+				#CH23
+				info "  Removing the at package(s)."
+				apt -y remove at -qq &>/dev/null
+				#CH27
+				info "  Removing the git package(s)."
+				apt -y remove git -qq &>/dev/null
 			fi
 
 			info "The lab enviornment has been completely removed."
