@@ -24,7 +24,8 @@
 # TODO:
 # LAB01-01 - Student Install
 # LAB07-01 - GRADING
-# LAB13-01 - (ssh) pg. 364-365
+# LAB10-01 - SFTP in CHROOT JAIL (SEE LAB 29)
+# LAB13-01 - (ssh) pg. 364-365, TCP WRAPPERS
 # LAB17-01 - (lsmod)
 # LAB23-01 - Network Troubleshooting
 # LAB29-01 - Chroot on Apache Server
@@ -73,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.18"
+g_VERSION="0.0.19"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -358,6 +359,7 @@ function update ()
 
 		printf '#!/bin/bash\n\n' >> updater.sh
 		printf "cp \"$l_TMP_FILE\" \"$l_ABS_PATH\"\n" >> updater.sh
+		printf "rm $g_SCRIPT_PATH/updater.sh" >> updater.sh
 
 		chmod +x updater.sh
 		chmod 770 "$l_TMP_FILE"
@@ -550,7 +552,7 @@ function backup_lab ()
 	fi
 
 	info "  Creating a backup of the \"$l_WORKING_DIRECTORY\" directory."
-	cp -r "$l_WORKING_DIRECTORY"{,.bak}
+	mv "$l_WORKING_DIRECTORY"{,.bak}
 }
 # *************************** script specific functions ************************
 
@@ -1356,6 +1358,9 @@ function chapter_7 ()
 			#9
 			#mkdir -p "$l_WORKING_DIRECTORY/numbered/{1..9}/{1..9}"
 
+			#10
+			#diff -q "$l_WORKING_DIRECTORY/numbered/1" "$l_WORKING_DIRECTORY/numbered/3"
+
 			#12
 			# Soft Link Enterprise-A from JTK (Done In Lab).
 			#ln -s "$g_LAB_PATH/$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Montgomery Scott/USS Enterprise-A"
@@ -1631,7 +1636,7 @@ function chapter_8 ()
 
 			#Answers
 			#15b
-			#awk -F ',' '{$3,$2,$1}' starfleet-ships.txt
+			#awk -F ',' '{print $3,$2,$1}' starfleet-ships.txt
 
 			#15c
 			#awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V
@@ -1673,7 +1678,7 @@ function chapter_8 ()
 
 			# HE WHO SHALL NOT BE NAMED
 			info "   Creating hwsnbn.sh script."
-			printf '#!/bin/bash\n\n' >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
+			printf '#!/bin/sh\n\n' >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
 			printf "sed -i 's/Tom Marvolo Riddle/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
 			printf "sed -i 's/Lord Voldemort/He who shall not be named/g' /labs/CH08/wizard-names.txt\n" >> "$l_WORKING_DIRECTORY/hwsnbn.sh"
 			chown root:root "$l_WORKING_DIRECTORY/hwsnbn.sh"
@@ -2166,6 +2171,9 @@ function chapter_8 ()
 			Alastor (Mad-Eye) Moody
 			Newt Scamander
 			EOF
+
+			# Change permissions for the changes under the VIM command #21
+			chmod 554 "$l_WORKING_DIRECTORY/wizard-names.txt"
 
 			# written-numbers
 			cat > "$l_WORKING_DIRECTORY/written-numbers.txt" <<-EOF
@@ -4639,7 +4647,6 @@ function chapter_29 ()
 			;;
 	esac
 }
-
 # *************************** begin of script proper ***************************
 process_command_line_options "${@}"
 internal_consistency_option_checks
@@ -4696,7 +4703,7 @@ if ((g_ARG_INSTALL==1)); then
 
 	if ! ((g_ARG_FINISH_INSTALL==1)); then
 		if [ -n "$g_INSTALL_DATE" ]; then
-			printf "The install date of this lab was on: $g_INSTALL_DATE\n"
+			printf "\nThe install date of this lab was on: $g_INSTALL_DATE\n"
 
 			read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
 			printf "\n\n"
@@ -4742,7 +4749,7 @@ if ((g_ARG_INSTALL==1)); then
 				systemctl disable ssh 2>/dev/null
 
 				# Chapter 8 (Remove hwsnbn.sh)
-				info "    Cleaning up the /etc/crontab table."
+				info "  Cleaning up the /etc/crontab table."
 				sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
 
 				# Chapter 12 (Remove Users)
@@ -4751,47 +4758,49 @@ if ((g_ARG_INSTALL==1)); then
 				test_user labuser5
 				test_group labusers5
 
-				# Chapter 12 (Unmount Disk)
+				# Chapter 12 (Remove Quota Disk)
 				if $(mount | grep -qw /dev/sdb1); then
 					info "  Unmounting the quota disk /dev/sdb1"
 					umount --lazy /dev/sdb1
 				fi
 
-				# Chapter 12 (Wipe Disk)
-				info "  Resetting disk(s)."
+				info "  Resetting disk /dev/sdb."
 				wipefs /dev/sdb --all --force --quiet
+				sgdisk --zap /dev/sdb >> /dev/nul
 
-				# Chapter 18 (Unmount Disk)
+				# Chapter 18 (Remove Disk)
 				if $(mount | grep -qw /dev/sdc1); then
 					info "  Unmounting the disk /dev/sdc1"
 					umount --lazy /dev/sdc1
 				fi
 
-				# Chapter 18 (Wipe Disk)
-				info "  Resetting disk(s)."
+				info "  Resetting disk /dev/sdc."
 				wipefs /dev/sdc --all --force --quiet
+				sgdisk --zap /dev/sdc >> /dev/nul
 
-				# Chapter 19 (Unmount Disk)
+				# Chapter 19 (Cleanup Volume Group)
 				if $(mount | grep -qw /dev/mapper/vg1-CIT220); then
 					info "  Unmounting the volume group /dev/mapper/vg1-CIT220"
 					umount --lazy /dev/mapper/vg1-CIT220
 				fi
 
-				# Chapter 19 (Cleanup Volume Group)
 				if [ -b /dev/mapper/vg1-CIT220 ]; then
 					info "  Removing Volume Group."
 
 					vgchange -a n vg1 >> /dev/null 2>&1
-					lvremove /dev/vg1/CIT220 >> /dev/null 2>&1
+					lvremove --force /dev/vg1/CIT220 >> /dev/null 2>&1
 					vgremove vg1 >> /dev/null 2>&1
 					pvremove /dev/sdd >> /dev/null 2>&1
 					pvremove /dev/sde >> /dev/null 2>&1
 				fi
 
-				# Chapter 19 (Wipe Disk)
-				info "  Resetting disk(s)."
+				info "  Resetting disks /dev/sdd."
 				wipefs /dev/sdd --all --force --quiet
+				sgdisk --zap /dev/sdd >> /dev/nul
+
+				info "  Resetting disks /dev/sde."
 				wipefs /dev/sde --all --force --quiet
+				sgdisk --zap /dev/sde >> /dev/nul
 
 				# Chapter 19 (Cleanup RAID)
 				if [ -b /dev/md0 ]; then
@@ -4802,17 +4811,19 @@ if ((g_ARG_INSTALL==1)); then
 
 					info "  Stopping RAID volume /dev/md0"
 					mdadm --stop /dev/md0
-
-					info "  Resetting disk(s)."
-					wipefs /dev/sdf --all --force --quiet
-					sgdisk --zap /dev/sdf >> /dev/nul
-
-					wipefs /dev/sdg --all --force --quiet
-					sgdisk --zap /dev/sdg >> /dev/nul
-
-					wipefs /dev/sdh --all --force --quiet
-					sgdisk --zap /dev/sdh >> /dev/nul
 				fi
+
+				info "  Resetting disk /dev/sdf."
+				wipefs /dev/sdf --all --force --quiet
+				sgdisk --zap /dev/sdf >> /dev/nul
+
+				info "  Resetting disk /dev/sdg."
+				wipefs /dev/sdg --all --force --quiet
+				sgdisk --zap /dev/sdg >> /dev/nul
+
+				info "  Resetting disk /dev/sdh."
+				wipefs /dev/sdh --all --force --quiet
+				sgdisk --zap /dev/sdh >> /dev/nul
 
 				# Chapter 22 (Reset Firewall)
 				info "  Resetting ipTables."
@@ -4870,7 +4881,7 @@ if ((g_ARG_INSTALL==1)); then
 				apt -y remove git -qq &>/dev/null
 			fi
 
-			info "The lab enviornment has been completely removed."
+			info "The lab enviornment has been completely removed.\n\n"
 		fi
 	fi
 
