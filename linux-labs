@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.19"
+g_VERSION="0.0.20"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -2361,30 +2361,119 @@ function chapter_9 ()
 
 			cleanup_and_exit_with_code 1
 
-			#Answers
+			#ANSWERS LAB09-01
+			#1
+			#cd /labs/CH09/LAB09-01
+			#chmod labuser1:labusers2 Constellations
+			#cd Constellations
+
+			#3
+			#ls -la
+
+			#2
+			#touch venatici.txt
+
+			#4
+			#cd ..
+
+			#5
+			#chmod -R labuser1:labusers2 Constellations
+			#cd Constellations
+
+			#6
+			#ls -la
+
+			#7
+			#touch pleiades.txt
+
+			#9
+			#cd ..
+
+			#10
+			#expected: chmod g+s Consetllations
+			#accepted: chmod 02644 Constellations
+			#cd Constellations
+
+			#11
+			#touch pegasus.txt
+
+			#12
+			#ls -la
+
+			#ANSWERS LAB09-02
 			#3
 			#printf "E=mc2" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
 
+			#4
+			#su labuser2
+
 			#5
 			#printf "If you can't explain it to a six-year-old, you don't understand it yourself." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+			#Will be denied, group permissions are read only and labuser2 not in labusers1 group.
+
+			#6
+			#exit
 
 			#7
 			#chmod 660 "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
 
+			#8
+			#su labuser2
+
 			#9
 			#printf "Logic will get you from A to Z; imagination will get you everywhere." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
+			#Will be denied, labuser2 not in labusers1 group.
+
+			#10
+			#exit
 
 			#12
+			#find -type f -user labuser2
+
+			#13
 			#printf "This must be gravity!" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
 
 			#14
+			#su labuser2
+
+			#15
 			#printf "Nature is pleased with simplicity. And nature is no dummy." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
 
 			#16
+			#exit
+
+			#17
 			#printf "Any man whose errors take ten years to correct is quite a man." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/oppenheimer.txt"
+			#printf "Any man whose errors take ten years to correct is quite a man." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
+			#Will be denied for hawking.txt, labuser3 is not in the labusers1 group.
+
+			#18
+			#su labuser2
+
+			#19
+			#chmod 660 "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
 
 			#20
+			#exit
+
+			#21
 			#printf "People who boast about their I.Q. are losers." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
+
+			#22
+			#id -G labuser3
+
+			#23
+			#id -G labuser2
+
+			#24
+			#cat physicists-list
+
+			#25
+			#./physicists-list
+
+			#26
+			#chmod +x physicists-list
+			#./physicists-list
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -2428,6 +2517,7 @@ function chapter_9 ()
 			touch "$l_WORKING_DIRECTORY/$l_LAB/Constellations/cassiopeia.txt"
 
 			# SET PERMISSIONS FOR FILES
+			chown labuser1:labusers1 "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
 			chmod 00644 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
 			chmod 00744 "$l_WORKING_DIRECTORY/$l_LAB/Constellations/."
 			chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
