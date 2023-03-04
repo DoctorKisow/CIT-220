@@ -1,7 +1,7 @@
 # CIT-220
 
-**linux-lab.sh** - A script used to download, setup and grade the CIT-220 lab enviornment in my CIT-220 Linux System Administration classes.<br />
-Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
+**linux-lab.sh** - A script used to download, setup and grade the CIT-220 lab enviornment for my _CIT-220 Linux System Administration_ classes.<br />
+Copyright &copy; 2022-2023, Dr. Matthew Kisow <mkisow@ccac.edu>
 
 ## Tasks
 - [ ] LAB01-01 - Student Install
