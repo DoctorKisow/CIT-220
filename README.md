@@ -41,7 +41,7 @@ Copyright &copy; 2022-2023, Dr. Matthew Kisow <matthew.kisow@kisow.org>
 By typing _linux-lab_ with no options, or _linux-lab -h_ you can get help.
 
 ## Warning
-Do not use this script in a _PRODUCTION_ enviornment with out testing and validating it first.
+This is a learning and teaching tool _ONLY_ and should _NOT_ be used in a _PRODUCTION_ enviornment!
 
 ## License
 License (GPL v3.0)
