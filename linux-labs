@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.20"
+g_VERSION="0.0.21"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -593,6 +593,8 @@ function base ()
 	apt -y install sysstat -qq &>/dev/null
 	info "    Installing the procinfo package(s)."
 	apt -y install procinfo -qq &>/dev/null
+	info "    Installing the ioping package(s)."
+	apt -y install ioping -qq &>/dev/null
 	#CH20
 	info "    Installing the network-manager package(s)."
 	apt -y install network-manager -qq &>/dev/null
@@ -645,14 +647,39 @@ function base ()
 	set +u
 
 	# UID 500 - mkisowa
+	#info "    Creating the mkisowa group."
+	#if ! [ $(getent group mkisowa) ]; then
+	#	groupadd -g 500 mkisowa
+	#else
+	#	warning "A previous lab enviornment may not have been cleaned up corretly."
+	#fi
+
+	#info "    Creating the mkisowa account."
+	#if ! [ "`id -u mkisowa 2>/dev/null`" ]; then
+	#	useradd --comment "Dr. Matthew Kisow" --uid 500 --create-home --no-user-group --gid 500 --groups adm,cdrom,sudo,dip,plugdev,lxd --shell /bin/bash mkisowa
+	#	chown mkisowa:mkisowa /home/mkisowa
+	#	echo 'mkisowa:Ch354vk!0010' | chpasswd
+	#
+	#	sed -i '/# User privilege specification/ a mkisowa ALL=(ALL) NOPASSWD:ALL' /etc/sudoers
+	#else
+	#	warning "    A previous lab enviornment may not have been cleaned up corretly."
+	#fi
+
+	#info "    Creating the ccacits group."
+	#if ! [ $(getent group ccacits) ]; then
+	#	groupadd -g 510 ccacits
+	#else
+	#	warning "A previous lab enviornment may not have been cleaned up corretly."
+	#fi
 
 	#if ! [ "`id -u ccacits 2>/dev/null`" ]; then
-	#	useradd -c "CCAC ITS" -m -s /bin/bash ccacits
-	#	usermod -u 510 ccacits &>/dev/null
-	#	usermod -g ccacits ccacits &>/dev/null
-	#	groupmod -g 510 ccacits
+	#	useradd -c "CCAC ITS" --uid 510 --create-home --no-user-group --gid 510 --groups adm,cdrom,sudo,dip,plugdev,lxd --shell /bin/bash ccacits
 	#	chown ccacits:ccacits /home/ccacits
 	#	echo 'ccacits:2T$qj3Dd7aO1bQiZ' | chpasswd
+	#
+	#	sed -i '/# User privilege specification/ a ccacits ALL=(ALL) NOPASSWD:ALL' /etc/sudoers
+	#else
+	#	warning "    A previous lab enviornment may not have been cleaned up corretly."
 	#fi
 
 	# ADD USERS
@@ -2986,7 +3013,7 @@ function chapter_12 ()
 			#echo 'labuser5:P@$$w0rd' | chpasswd
 
 			#2
-			#quotacheck -avugc
+			#sudo quotacheck -avugc
 
 			#3
 			#edquota -u labuser5
@@ -4754,7 +4781,7 @@ fi
 
 # Process Options
 if ((g_ARG_CHANGE_LAB==1)); then
-	if [ $EUID -ne 1000 ]; then
+	if [ $EUID -ne 500 ]; then
 		warning "This option can only be run by your instructor."
 		cleanup_and_exit_with_code 1
 	else
