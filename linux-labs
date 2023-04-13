@@ -2,7 +2,7 @@
 #
 # linux-labs - A script used to download, setup and grade the CIT-220 lab
 # enviornment in my CIT-220 Linux System Administration classes.
-# Copyright (c) 2022-2023 Matthew R. Kisow, D.Sc. <matthew.kisow@kisow.org>
+# Copyright (c) 2022-2023 Dr. Matthew Kisow <mkisow@ccac.edu>
 #
 # License (GPL v3.0)
 # ------------------
@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.22"
+g_VERSION="0.0.23"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -598,6 +598,9 @@ function base ()
 	#CH20
 	info "    Installing the network-manager package(s)."
 	apt -y install network-manager -qq &>/dev/null
+	apt -y install traceroute -qq &>/dev/null
+	apt -y install nmap -qq &>/dev/null
+	apt -y install iftop -qq &>/dev/null
 	#CH21
 	info "    Installing the whois package(s)."
 	apt -y install whois -qq &>/dev/null
@@ -3016,7 +3019,7 @@ function chapter_12 ()
 			#sudo quotacheck -avugc
 
 			#3
-			#edquota -u labuser5
+			#sudo edquota -u labuser5
 
 			#4
 			#for i in {1..10}; do echo "IIIIIIIIIIIIIIIIIIII" >> file.labuser5; done
@@ -3633,22 +3636,22 @@ function chapter_18 ()
 			#mkfs.ext4 /dev/sdc1 >> /dev/null 2>&1
 
 			#5
-			# mkdir /labs/CH18/LAB18-01
+			# mkdir /labs/CH18/LAB18-01-BLK
 
 			#6
-			#printf "# Disk Lab: LAB18-01\n/dev/sdc1      /labs/CH18/LAB18-01	ext4	defaults 0 0\n" >> /etc/fstab
+			#printf "# Disk Lab: LAB18-01\n/dev/sdc1      /labs/CH18/LAB18-01-BLK	ext4	defaults 0 0\n" >> /etc/fstab
 
 			#7
-			#mount /labs/CH18/LAB18-01
+			#mount /labs/CH18/LAB18-01-BLK
 
 			#8
-			#chown labuser1:labusers1 /labs/CH18/LAB18-01
-			#chmod 02770 /labs/CH18/LAB18-01
+			#chown labuser1:labusers1 /labs/CH18/LAB18-01-BLK
+			#chmod 02770 /labs/CH18/LAB18-01-BLK
 
 			#9
 			#su labuser2
-			#mkdir /labs/CH18/LAB18-01/cats
-			#mkdir /labs/CH18/LAB18-01/dogs
+			#mkdir /labs/CH18/LAB18-01-BLK/cats
+			#mkdir /labs/CH18/LAB18-01-BLK/dogs
 
 			;;
 		-i)
@@ -3772,14 +3775,18 @@ function chapter_19 ()
 			#vgcreate vg1 /dev/sdd
 
 			#6
-			#lvcreate -L 124M -n CIT220 vg1
+			#lvcreate -n CIT220 -L 124M vg1
 
 			#8
 			#mkfs.ext4 -F -m 0 -L "CIT220-LVM" /dev/vg1/CIT220
 
 			#9
-			# mkdir /labs/CH19/LAB19-01
-			#printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01 ext4 defaults  0    0\n" >> /etc/fstab
+			#a.
+			#mkdir /labs/CH19/LAB19-01-LVM
+			#b.
+			#printf "/dev/mapper/vg1-CIT220 /labs/CH19/LAB19-01-LVM ext4 defaults  0    0\n" >> /etc/fstab
+			#c.
+			#mount /labs/CH19/LAB19-01-LVM
 
 			#10
 			#pvcreate /dev/sde
@@ -3790,6 +3797,16 @@ function chapter_19 ()
 			#14
 			#lvextend -L +124M /dev/vg1/CIT220
 
+			#17
+			#chown labuser1:labusers1 /labs/CH19/LAB19-01-LVM
+			#chmod 02770 /labs/CH19/LAB19-01-LVM
+
+			#EXTRA CREDIT
+			#df -h
+			#lvs
+			#resize2fs /dev/mapper/vg1-CIT220
+			#df -h
+
 			#ANSWERS LAB19-02
 			#1
 			#mdadm -C /dev/md0 -l 5 -n 3 /dev/sdf /dev/sdg /dev/sdh
@@ -3798,18 +3815,18 @@ function chapter_19 ()
 			#more /proc/mdstat
 
 			#3
-			#mkfs.ext4 /dev/md0 
+			#mkfs.ext4 -F -m 0 -L "CIT220-RAID" /dev/md0
 
 			#4
-			#mkdir /labs/CH19/LAB19-02
-			#printf "/dev/md0 /labs/CH19/LAB19-02 ext4 defaults  0    0\n" >> /etc/fstab
+			#mkdir /labs/CH19/LAB19-02-RAID
+			#printf "/dev/md0 /labs/CH19/LAB19-02-RAID ext4 defaults  0    0\n" >> /etc/fstab
 
 			#5
-			#mount /labs/CH19/LAB19-02
+			#mount /labs/CH19/LAB19-02-RAID
 
 			#6
-			#chown labuser1:labusers1 /labs/CH19/LAB19-02
-			#chmod 02770 /labs/CH19/LAB19-02
+			#chown labuser1:labusers1 /labs/CH19/LAB19-02-RAID
+			#chmod 02770 /labs/CH19/LAB19-02-RAID
 			;;
 		-i)
 			info "There is no lab available for this chapter."
@@ -3842,7 +3859,7 @@ function chapter_19 ()
 				info "  Removing Volume Group."
 
 				vgchange -a n vg1 >> /dev/null 2>&1
-				lvremove /dev/vg1/CIT220 >> /dev/null 2>&1
+				lvremove --force /dev/vg1/CIT220 >> /dev/null 2>&1
 				vgremove vg1 >> /dev/null 2>&1
 				pvremove /dev/sdd >> /dev/null 2>&1
 				pvremove /dev/sde >> /dev/null 2>&1
@@ -3954,6 +3971,7 @@ function chapter_19 ()
 
 			# Copyright © CC BY-NC-ND 4.0, (2022 - 2023)
 			# Dr. Matthew Kisow
+
 
 			EOF
 
@@ -4117,6 +4135,9 @@ function chapter_22 ()
 
 			#3
 			#iptables -D INPUT -p icmp -j DROP
+
+			#EXTRA
+			#iptables -A INPUT -p tcp --dport 22 -j DROP
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -4272,7 +4293,7 @@ function chapter_24 ()
 
 			# Create a script to display a message.
 			printf '#!/bin/sh' >> "$l_WORKING_DIRECTORY/lab2401.sh"
-			printf "wall \"It's time to stop working on these labs.\"\n" >> "$l_WORKING_DIRECTORY/lab2401.sh"
+			printf "\nwall \"It's time to stop working on these labs.\"\n" >> "$l_WORKING_DIRECTORY/lab2401.sh"
 			chown labuser1:labusers1 "$l_WORKING_DIRECTORY/lab2401.sh"
 			chmod 770 "$l_WORKING_DIRECTORY/lab2401.sh"
 
@@ -4987,6 +5008,9 @@ if ((g_ARG_INSTALL==1)); then
 				#CH20
 				info "  Removing the network-manager package(s)."
 				apt -y remove network-manager -qq &>/dev/null
+				apt -y remove traceroute -qq &>/dev/null
+				apt -y remove nmap -qq &>/dev/null
+				apt -y remove iftop -qq &>/dev/null
 				#CH21
 				info "  Removing the whois package(s)."
 				apt -y remove whois -qq &>/dev/null
