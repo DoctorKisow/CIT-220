@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.23"
+g_VERSION="0.0.24"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -554,6 +554,19 @@ function backup_lab ()
 	info "  Creating a backup of the \"$l_WORKING_DIRECTORY\" directory."
 	mv "$l_WORKING_DIRECTORY"{,.bak}
 }
+
+# (install_package) - Passed arguements ($1) package name.
+function install_package ()
+{
+	local l_package="$1"
+
+	# Install packages and report error conditions as warning.
+	info "    Installing the $l_package package(s)."
+	apt -y install $l_package -qq &>/dev/null
+	if [ $? -ne 0 ]; then
+		warning "The $l_package installation failed with an error condition."
+	fi
+}
 # *************************** script specific functions ************************
 
 # ##############################################################################
@@ -570,48 +583,65 @@ function base ()
 	info "Installing the base lab enviornment."
 
 	info "  Installing the required system packages."
+	info "  Checking package management sanity."
+	apt update -qq &>/dev/null
+	if [ $? -ne 0 ]; then
+		error "An issue exists in the package manager, please address and run this script again."
+	fi
+
 	#CH06 (ifconfig)
 	info "    Installing the net-tools package(s)."
-	apt -y install net-tools -qq &>/dev/null
+	install_package net-tools
+
 	#CH06 (lynx browser)
 	info "    Installing the lynx package(s)."
-	apt -y install lynx -qq &>/dev/null
+	install_package lynx
+
 	#CH07
 	info "    Installing the tree package(s)."
-	apt -y install tree -qq &>/dev/null
+	install_package tree
+
 	#CH09
 	info "    Installing the acl package(s)."
-	apt -y install acl -qq &>/dev/null
+	install_package acl
+
 	#CH11
 	info "    Installing the zip package(s)."
-	apt -y install zip -qq &>/dev/null
+	install_package zip
+
 	#CH12
 	info "    Installing the quota package(s)."
-	apt -y install quota -qq &>/dev/null
+	install_package quota
+
 	#CH16
 	info "    Installing the sysstat package(s)."
-	apt -y install sysstat -qq &>/dev/null
+	install_package sysstat
 	info "    Installing the procinfo package(s)."
-	apt -y install procinfo -qq &>/dev/null
+	install_package procinfo
 	info "    Installing the ioping package(s)."
-	apt -y install ioping -qq &>/dev/null
+	install_package ioping
+
 	#CH20
 	info "    Installing the network-manager package(s)."
-	apt -y install network-manager -qq &>/dev/null
-	apt -y install traceroute -qq &>/dev/null
-	apt -y install nmap -qq &>/dev/null
-	apt -y install iftop -qq &>/dev/null
+	install_package network-manager
+	install_package traceroute
+	install_package nmap
+	install_package iftop
+
 	#CH21
 	info "    Installing the whois package(s)."
-	apt -y install whois -qq &>/dev/null
+	install_package whois
+
 	#CH23
 	info "    Installing the at package(s)."
-	apt -y install at -qq &>/dev/null
+	install_package at
+
 	#CH27
 	info "    Installing the git package(s)."
-	apt -y install git -qq &>/dev/null
+	install_package git
 
 	# BACKUP THE FILESYSTEM TABLE
+	info "Backing up the filesystem table."
 	cp -f /etc/fstab{,.bak}
 
 	# ADD GROUPS
@@ -4785,6 +4815,7 @@ function chapter_29 ()
 			;;
 	esac
 }
+
 # *************************** begin of script proper ***************************
 process_command_line_options "${@}"
 internal_consistency_option_checks
@@ -5045,7 +5076,12 @@ if ((g_ARG_ROLLBACK_LAB==1)); then
 fi
 
 if ((g_ARG_UPDATE==1)); then
-	update
+	if [ $EUID -ne 0 ]; then
+		warning "This option can only be run using administrative permissions."
+		cleanup_and_exit_with_code 1
+	else
+		update
+	fi
 fi
 
 cleanup_and_exit_with_code 0
