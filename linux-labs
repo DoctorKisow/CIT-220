@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.28"
+g_VERSION="0.0.29"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -642,14 +642,6 @@ function lab_profile ()
 		info "Reading the students lab profile."
 
 		source "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
-
-		if [ ! -n "$v_SECTION" ]; then 
-			error "  Manually update the students lab profile by running this script again using \"${g_PROGNAME} -I\""
-		fi
-
-		if [ ! -n "$v_LASTNAME" ]; then
-			error "  Manually update the students lab profile by running this script again using \"${g_PROGNAME} -I\""
-		fi
 	else
 		cat > "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" <<-EOF
 		# The students class section number.
@@ -1181,8 +1173,6 @@ function chapter_5 ()
 			info "There is no lab to roll forward for lab: $l_LAB."
 			;;
 		-g)
-
-
 			info "Grading the lab(s) for chapter: $l_CH_NUM."
 
 			l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
