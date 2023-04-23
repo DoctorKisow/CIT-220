@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.24"
+g_VERSION="0.0.25"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -119,6 +119,7 @@ g_SCRIPT_PATH="`( cd \"$g_SCRIPT_PATH\" && pwd )`"
 declare -i g_ARG_CHANGE_LAB=0
 declare -i g_ARG_GRADE_LAB=0
 declare -i g_ARG_INSTALL=0
+declare -i g_ARG_PROFILE=0
 declare -i g_ARG_FINISH_INSTALL=0
 declare -i g_ARG_ROLLBACK_LAB=0
 declare -i g_ARG_UPDATE=0
@@ -127,6 +128,8 @@ declare -i g_ARG_CHANGE=0
 declare -i g_ARG_GRADE=0
 declare -i g_ARG_ROLLBACK=0
 
+declare g_LAB_PROFILE="${g_PROGRAM_NAME}.profile"
+declare g_CLASS_NAME="CIT-220"
 declare g_FIRST_TOKEN=""
 declare g_INSTALL_DATE=""
 
@@ -194,13 +197,14 @@ function print_usage ()
 
 	cat << EOF
 
-  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-r <1-29>]
+  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-I] [-r <1-29>]
                     [-u|--update] [-v]
   Options:
 	-c                     roll the enviornment forward to a lab [1-29]
 	-g                     grade a completed lab [1-29]
 	-h                     show this help message
 	-i --install           install the lab enviornment
+	-I                     set the students lab profile
 	-r                     roll back a specific lab [1-29]
 	-u --update            update the ${g_PROGNAME} script
 	-v                     display the version number of ${g_PROGNAME} and exit
@@ -245,7 +249,7 @@ function process_command_line_options ()
 
 	# Error trapping is turned off because we want to handle errors.
 	set +e
-		l_TEMP="$(getopt -o c:g:hir:uvz --long install,update -n "${g_PROGNAME}" -- "${@}")"
+		l_TEMP="$(getopt -o c:g:hiIr:uvz --long install,update -n "${g_PROGNAME}" -- "${@}")"
 		l_RC="${?}"
 	set -e
 
@@ -280,6 +284,7 @@ function process_command_line_options ()
 			-g) g_ARG_GRADE_LAB=1; g_ARG_GRADE=${2}; (( g_ARG_GRADE >= 1 && g_ARG_GRADE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
 			-h) display_usage_message_and_bail_out ;;
 			-i) g_ARG_INSTALL=1; shift ;;
+			-I) g_ARG_PROFILE=1; shift ;;
 			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
 			-u) g_ARG_UPDATE=1; shift ;;
 			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
@@ -295,35 +300,42 @@ function internal_consistency_option_checks ()
 	while true ; do
 		case "$g_FIRST_TOKEN" in
 			-c)
-				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL  ||  g_ARG_UPDATE)); then
+				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE)); then
 					warning "You cannot change the enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-g)
-				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
+				if ((g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
 					warning "You cannot grade a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-i)
-				if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+				if ((g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
 					warning "You cannot setup the labs enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
+			-I)
+				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+					warning "You cannot create or set the lab profile with any other options set."
+					cleanup_and_exit_with_code 1
+				fi
+				break
+				;;
 			-r)
-				if ((g_ARG_GRADE_LAB ||g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
+				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
 					warning "You cannot rollback a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-u)
-				if ((g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL)); then
+				if ((g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
 					warning "You cannot update this script with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
@@ -564,8 +576,101 @@ function install_package ()
 	info "    Installing the $l_package package(s)."
 	apt -y install $l_package -qq &>/dev/null
 	if [ $? -ne 0 ]; then
-		warning "The $l_package installation failed with an error condition."
+		warning "The $l_package package installation failed with an error condition."
 	fi
+}
+
+# (attribute) - Passed arguements ($1) text string of the attribute you're setting, ($2) attribute text or variable.
+function attribute ()
+{
+	# The number of arguments passed into the function.
+	l_NUM_ARGS='^[1-2]+$'
+
+	# Response from the keyboard.
+	local l_REPLY=""
+
+	# Input response from the keyboard.
+	local l_ATTRIBUTE=""
+
+	if ! [[ $# =~ $l_NUM_ARGS ]]; then
+		error "  Function: attribute was passed a value that is out of bounds.  Did you quote the variable?"
+	fi
+
+	if [ -z "$2" ]; then
+		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is empty." >&2
+		l_REPLY="y"
+	else
+		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is: ${g_WHITE_TEXT}${2}${g_RESET_ATTS}" >&2
+	fi
+
+	if [ -z "$l_REPLY" ]; then
+		read -e -r -s -n 1 -p "                Would you like to change this (y/n): " l_REPLY
+	fi
+
+	if [[ ${l_REPLY} =~ ^[Yy]$ ]]; then
+		while true; do
+			read -r -p "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             Enter the new ${1}: " l_ATTRIBUTE
+			if [ ! -z "$l_ATTRIBUTE" ]; then
+				break
+			fi
+		done
+	else
+		l_ATTRIBUTE="$2"
+	fi
+
+	# Return value to calling function.
+	echo "$l_ATTRIBUTE"
+}
+
+# (lab_profile) - Create a default lab profile or source the one previously created.
+function lab_profile ()
+{
+	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
+		info "Reading the students lab profile."
+
+		source "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
+	else
+		cat > "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" <<-EOF
+		# The students class section number.
+		v_SECTION=""
+
+		# The students last name.
+		v_LASTNAME=""
+		EOF
+
+		info "  A lab profile file was created at ${g_SCRIPT_PATH}/${g_LAB_PROFILE}."
+		info "  Manually update this profile by running this script again using  ${g_PROGNAME} -I"
+		cleanup_and_exit_with_code 0
+	fi
+}
+
+# (interactive_lab_profile) - Collect lab profile information for automated grading.
+function interactive_lab_profile ()
+{
+	local l_COLLECTION_RESPONSE=""
+
+	until [[ $l_COLLECTION_RESPONSE =~ ^[Y|y]$ ]]; do
+		# Linux Class Section.
+		v_SECTION=$( attribute "linux class section" "${v_SECTION}" )
+		v_SECTION="${g_CLASS_NAME}-${v_SECTION}"
+		sed -i "s/v_SECTION=\"[^\"]*\"/v_SECTION=\"${v_SECTION}\"/" "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
+
+		# Students Last Name.
+		v_LASTNAME=$( attribute "students last name" "${v_LASTNAME}" )
+		sed -i "s/v_LASTNAME=\"[^\"]*\"/v_LASTNAME=\"${v_LASTNAME}\"/" "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
+
+		# Validate Information.
+		info "Please validate your entered information."
+		printf "\n"
+		printf "                Linux Section Name:               ${g_WHITE_TEXT}${v_SECTION,,}\n${g_RESET_ATTS}"
+		printf "                 Student Last Name:               ${g_WHITE_TEXT}${v_LASTNAME}\n${g_RESET_ATTS}"
+		printf "\n"
+
+		# Validate Information Response.
+		read -e -r -s -n 1 -p "         Please verify that your information is correct, (y/n)?" l_COLLECTION_RESPONSE
+	done
+
+	info "  The ${g_SCRIPT_PATH}/${g_LAB_PROFILE} was updated successfully."
 }
 # *************************** script specific functions ************************
 
@@ -589,55 +694,42 @@ function base ()
 		error "An issue exists in the package manager, please address and run this script again."
 	fi
 
-	#CH06 (ifconfig)
-	info "    Installing the net-tools package(s)."
+	#CH05
 	install_package net-tools
 
-	#CH06 (lynx browser)
-	info "    Installing the lynx package(s)."
+	#CH06
 	install_package lynx
 
 	#CH07
-	info "    Installing the tree package(s)."
 	install_package tree
 
 	#CH09
-	info "    Installing the acl package(s)."
 	install_package acl
 
 	#CH11
-	info "    Installing the zip package(s)."
 	install_package zip
 
 	#CH12
-	info "    Installing the quota package(s)."
 	install_package quota
 
 	#CH16
-	info "    Installing the sysstat package(s)."
 	install_package sysstat
-	info "    Installing the procinfo package(s)."
 	install_package procinfo
-	info "    Installing the ioping package(s)."
 	install_package ioping
 
 	#CH20
-	info "    Installing the network-manager package(s)."
 	install_package network-manager
 	install_package traceroute
 	install_package nmap
 	install_package iftop
 
 	#CH21
-	info "    Installing the whois package(s)."
 	install_package whois
 
 	#CH23
-	info "    Installing the at package(s)."
 	install_package at
 
 	#CH27
-	info "    Installing the git package(s)."
 	install_package git
 
 	# BACKUP THE FILESYSTEM TABLE
@@ -1067,7 +1159,12 @@ function chapter_5 ()
 			info "There is no lab to roll forward for lab: $l_LAB."
 			;;
 		-g)
-			info "There is no grading module available for lab: $l_LAB. Please record\nyour answers on your lab sheet and upload them to blackboard."
+
+
+			info "Grading the lab(s) for chapter: $l_CH_NUM."
+
+			l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+			history > "$l_WORKING_DIRECTORY/$l_LAB-cmd_history.txt"
 
 			#ANSWERS CH05-01
 
@@ -1082,6 +1179,12 @@ function chapter_5 ()
 
 			#4
 			#sudo systemctl start ssh
+
+			#5
+			#systemctl status ssh
+
+			#6
+			#runlevel
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -4487,6 +4590,7 @@ function chapter_26 ()
 			info "There is no grading module available for lab: $l_LAB."
 			cleanup_and_exit_with_code 1
 
+
 			#ANSWERS LAB26-01
 			#1
 			#    #!/bin/bash
@@ -4819,6 +4923,7 @@ function chapter_29 ()
 # *************************** begin of script proper ***************************
 process_command_line_options "${@}"
 internal_consistency_option_checks
+lab_profile
 
 # Only clear screen and present script banner when GAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
@@ -4829,6 +4934,19 @@ fi
 # Update Notice
 if ((g_ARG_UPDATE==0)); then
 	update_notice
+fi
+
+# Interactive configuration of the configuration file
+if ((g_ARG_PROFILE==1)); then
+	info "The interactive configuration file option was selected."
+
+	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
+		interactive_lab_profile
+	else
+		error "  The configuration file doesn't exist!"
+	fi
+
+	cleanup_and_exit_with_code 0
 fi
 
 # Process Options
