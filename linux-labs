@@ -74,7 +74,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.25"
+g_VERSION="0.0.26"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -342,6 +342,19 @@ function internal_consistency_option_checks ()
 				break
 				;;
 		esac
+
+		# **************************** student profile options ****************************
+		if ((g_ARG_PROFILE==0)); then
+			# Exit on unset v_LASTNAME.
+			if [ -z $v_LASTNAME ]; then
+				error "  The v_LASTNAME student profile option cannot be empty."
+			fi
+
+			# Exit on unset v_SECTION.
+			if [ -z $v_SECTION ]; then
+				error "  The v_SECTION student profile option cannot be empty."
+			fi
+		fi
 	done
 }
 
@@ -629,6 +642,9 @@ function lab_profile ()
 		info "Reading the students lab profile."
 
 		source "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
+		if [[ -n "$v_SECTION" ] || [ -n "$v_LASTNAME" ][]; then
+			error "  Manually update the students lab profile by running this script again using ${g_PROGNAME} -I"
+		fi
 	else
 		cat > "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" <<-EOF
 		# The students class section number.
@@ -639,7 +655,7 @@ function lab_profile ()
 		EOF
 
 		info "  A lab profile file was created at ${g_SCRIPT_PATH}/${g_LAB_PROFILE}."
-		info "  Manually update this profile by running this script again using  ${g_PROGNAME} -I"
+		info "  Manually update the students lab profile by running this script again using ${g_PROGNAME} -I"
 		cleanup_and_exit_with_code 0
 	fi
 }
@@ -652,17 +668,18 @@ function interactive_lab_profile ()
 	until [[ $l_COLLECTION_RESPONSE =~ ^[Y|y]$ ]]; do
 		# Linux Class Section.
 		v_SECTION=$( attribute "linux class section" "${v_SECTION}" )
-		v_SECTION="${g_CLASS_NAME}-${v_SECTION}"
+		v_SECTION="${g_CLASS_NAME}-${v_SECTION^^}"
 		sed -i "s/v_SECTION=\"[^\"]*\"/v_SECTION=\"${v_SECTION}\"/" "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
 
 		# Students Last Name.
 		v_LASTNAME=$( attribute "students last name" "${v_LASTNAME}" )
+		v_LASTNAME="${v_LASTNAME^^}"
 		sed -i "s/v_LASTNAME=\"[^\"]*\"/v_LASTNAME=\"${v_LASTNAME}\"/" "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
 
 		# Validate Information.
 		info "Please validate your entered information."
 		printf "\n"
-		printf "                Linux Section Name:               ${g_WHITE_TEXT}${v_SECTION,,}\n${g_RESET_ATTS}"
+		printf "                Linux Section Name:               ${g_WHITE_TEXT}${v_SECTION}\n${g_RESET_ATTS}"
 		printf "                 Student Last Name:               ${g_WHITE_TEXT}${v_LASTNAME}\n${g_RESET_ATTS}"
 		printf "\n"
 
