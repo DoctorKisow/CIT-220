@@ -73,7 +73,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.30"
+g_VERSION="0.0.31"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -627,6 +627,15 @@ function backup_lab ()
 
 	info "  Creating a backup of the \"$l_WORKING_DIRECTORY\" directory."
 	mv "$l_WORKING_DIRECTORY"{,.bak}
+}
+
+# (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
+function reset_permissions_check ()
+{
+	if [ $EUID -ne 0 ]; then
+		warning "To properly reset this lab you must run the $g_PROGRAM_NAME script using sudo."
+		cleanup_and_exit_with_code 1
+	fi
 }
 
 # (install_package) - Passed arguements ($1) package name.
@@ -1281,26 +1290,6 @@ function chapter_5 ()
 			else
 				warning "runlevel - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
 			fi
-
-			#ANSWERS CH05-01
-
-			#1
-			#systemctl status ssh
-
-			#2
-			#sudo systemctl enable ssh
-
-			#3
-			#systemctl status ssh
-
-			#4
-			#sudo systemctl start ssh
-
-			#5
-			#systemctl status ssh
-
-			#6
-			#runlevel
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -1389,97 +1378,6 @@ function chapter_6 ()
 		-g)
 			info "There is no grading module available for lab: $l_LAB."
 			cleanup_and_exit_with_code 1
-
-			#ANSWERS LAB06-01
-			#1
-			#free
-
-			#2
-			#free -h
-
-			#3
-			#free --lohi
-
-			#4
-			#./lab06-01.sh &
-
-			#5
-			#ps -A | grep lynx
-
-			#6
-			#pstree | grep lynx
-
-			#7
-			#ps -A | grep lab06-01.sh
-
-			#8
-			#kill -9 <PID>
-			#pstree | grep lynx
-			#ps -A | grep lab06-01.sh
-
-			#9
-			#./lab06-01.sh &
-
-			#10
-			#a. ps -A | grep lynx
-			#b. kill <PID>
-			#c. kill -9 <PID>
-			#d. ps -A | grep lynx
-			#f. killall -9 lynx
-			#h. kill -9 <PID> (SCRIPT PID)
-
-			#11
-			#./lab06-01.sh &
-
-			#12
-			#top
-			#u
-			#labuser1
-			#q
-
-			#13
-			#ps aux | grep lab06-01.sh
-
-			#14
-			#sudo renice 5 <PID>
-
-			#15
-			#ps aux | grep lab06-01.sh
-
-			#16
-			#top
-			#u
-			#labuser1
-			#k
-			#<PID>
-			#9
-
-			#17
-			#pstree labuser1
-
-			#18
-			#screen
-			#[ESC]
-
-			#19
-			#pstree labuser1
-
-			#20
-			#[CTRL]+[A] and [CTRL]+[C]
-			#top
-			#[CTRL]+[A] [P]
-
-			#21
-			#lynx ccac.edu
-			#[CTRL]+[A] [P]
-
-			#22
-			#[CTRL]+[A]+["]
-			#[1]+[ENTER]
-
-			#23
-			#[CTRL]+[A]+["]
-			#[2] + [ENTER]
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -1638,93 +1536,6 @@ function chapter_7 ()
 		-g)
 			info "There is no grading module available for lab: $l_LAB."
 			cleanup_and_exit_with_code 1
-
-			#ANSWERS LAB07-01
-			#1
-			#tree /labs/CH07
-
-			#2
-			#Answer Questions
-
-			#3
-			#ls -li "Hikaru Sulu"
-			#ls -li "Montgomery Scott"
-
-			#4
-			#ls -li "Christopher Pike/USS Enterprise"
-			#ls -li "James T. Kirk/USS Enterprise"
-
-			#5
-			#NOTE: MUST BE RELATIVE PATH!
-			#ln -s ../James\ T.\ Kirk/USS\ Enterprise-A "USS Enterprise-A"
-
-			#6
-			#touch -d 01/01/2288 "labs/CH07/Nyota Uhura/USS Leondegrance"
-			
-			#7
-			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
-			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel"
-			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans"
-			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Officers"
-
-			#8
-			#rm -r "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel"
-
-			#9
-			#mkdir -p /labs/CH07/numbered/{1 .. 9}/{1 .. 9}
-
-			#10
-			#diff -q "$l_WORKING_DIRECTORY/numbered/1" "$l_WORKING_DIRECTORY/numbered/3"
-
-			#11
-			#mkdir -p /labs/CH07/Starfleet\ Federation/Personnel/{Capitans,Officers}
-
-			#12
-			#mv "Christopher\ Pike/ Starfleet\ Federation/Personnel/Capitans/
-			#mv Hikaru\ Sulu/ Starfleet\ Federation/Personnel/Capitans/
-			#mv James\ T.\ Kirk/ Starfleet\ Federation/Personnel/Capitans/
-			#mv Montgomery\ Scott/ Starfleet\ Federation/Personnel/Capitans/
-			#mv Nyota\ Uhura Starfleet\ Federation/Personnel/Capitans/
-
-			#13
-			# Soft Link Enterprise-A from JTK (Done In Lab).
-			#ln -s "$g_LAB_PATH/$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Montgomery Scott/USS Enterprise-A"
-
-			# USS Discovery
-			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Discovery" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Discovery" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
-
-			# USS Enterprise
-			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
-
-			# USS Enterprise-A
-			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Enterprise-A" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/"
-
-			# USS Excelsior
-			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/"
-			#rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/"
-
-			# USS Leondegrance
-			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
-			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/"
-
-			#14
-			#find /labs/CH07/difference/ -name *.txt | tree
-
-			#15
-			#find /labs/CH07/difference/ -name *.html -exec grep -iw Hello {} \;
-			#find /labs/CH07/difference/ -name *.html -exec grep -iw Zeus {} \;
-			#find /labs/CH07/difference/ -name *.html -exec grep -iw Aphrodite {} \;
-			#find /labs/CH07/difference/ -name *.html -exec grep -iw "<head>" {} \;
-
-			#16
-			#find /labs/CH07/difference/ -name *.txt -exec grep -iw fox {} \;
-			#find /labs/CH07/difference/ -name *.txt -exec grep -iw 7h3 {} \;
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -1951,114 +1762,6 @@ function chapter_8 ()
 		-g)
 			info "There is no grading module available for lab: $l_LAB."
 			cleanup_and_exit_with_code 1
-
-			#ANSWERS LAB08-01
-			#1
-			#cat frankenstein-letter.txt
-
-			#2
-			#tac frankenstein-letter.txt
-
-			#3
-			#more frankenstein-letter.txt
-
-			#4
-			#less frankenstein-letter.txt
-
-			#5
-			#nl frankenstein-letter.txt | more #ANSWER: made
-
-			#6
-			#head frankenstein-letter.txt
-
-			#7
-			#tail frankenstein-letter.txt
-
-			#8
-			#head -n 40 frankenstein-letter.txt | tail -n 10
-
-			#9
-			#cat wizard-names.txt
-
-			#10
-			#sort wizard-names.txt
-
-			#11
-			#sort wizard-names.txt -k 2
-
-			#12
-			#cat numbers.txt
-
-			#13
-			#sort numbers.txt
-
-			#14
-			#sort numbers.txt -n
-
-			#15
-			#cat starfleet-ships.txt
-
-			#15a
-			#ANSWER: In comma delimited format.
-
-			#15b
-			#awk -F ',' '{print $3,$2,$1}' starfleet-ships.txt
-
-			#15c
-			#awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V
-
-			#15d
-			#awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Constitution-class (31st century)"
-
-			#15e
-			#awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Enterprise"
-
-			#15f
-			#NOTE: Either answer is correct.
-			#awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c
-			#awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c | grep unknown
-
-			#15g
-			#tr [:lower:] [:upper:] < starfleet-ships.txt | awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' | sort -V
-
-			#16
-			#cat lorem-ipsum.txt
-
-			#16a
-			#OBSERVATION
-
-			#16b
-			#sed -e 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
-
-			#17
-			#cat lorem-ipsum.txt
-
-			#17a
-			#OBSERVATION
-
-			#17b
-			#sed -i 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
-
-			#18
-			#cat written-numbers.txt
-
-			#19
-			#cat written-numbers-search.txt
-
-			#20
-			#fgrep -f written-numbers-search.txt written-numbers.txt
-
-			#21
-			#ANSWER: USE VIM, MODIFY FILE
-
-			#22
-			#cat wizard-names.txt
-
-			#23
-			#ANSWER: USE VIM, MODIFY FILE
-
-			#24
-			#cat wizard-names.txt
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -2730,6 +2433,8 @@ function chapter_8 ()
 			chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
 			;;
 		-r)
+			reset_permissions_check
+
 			info "Resetting Lab: $l_CH_NUM."
 			backup_lab $l_CH_NUM
 			chapter_$l_CH_NUM -i $l_CH_NUM
@@ -2739,6 +2444,7 @@ function chapter_8 ()
 }
 
 # CH09 - File Permissions
+#        Lab Validated: 07-JUN-2023
 function chapter_9 ()
 {
 	local l_OPER="$1"
@@ -2776,120 +2482,6 @@ function chapter_9 ()
 			info "There is no grading module available for lab: $l_LAB."
 
 			cleanup_and_exit_with_code 1
-
-			#ANSWERS LAB09-01
-			#1
-			#cd /labs/CH09/LAB09-01
-			#chmod labuser1:labusers2 Constellations
-			#cd Constellations
-
-			#3
-			#ls -la
-
-			#2
-			#touch venatici.txt
-
-			#4
-			#cd ..
-
-			#5
-			#chmod -R labuser1:labusers2 Constellations
-			#cd Constellations
-
-			#6
-			#ls -la
-
-			#7
-			#touch pleiades.txt
-
-			#9
-			#cd ..
-
-			#10
-			#expected: chmod g+s Consetllations
-			#accepted: chmod 02644 Constellations
-			#cd Constellations
-
-			#11
-			#touch pegasus.txt
-
-			#12
-			#ls -la
-
-			#ANSWERS LAB09-02
-			#3
-			#printf "E=mc2" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
-
-			#4
-			#su labuser2
-
-			#5
-			#printf "If you can't explain it to a six-year-old, you don't understand it yourself." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
-			#Will be denied, group permissions are read only and labuser2 not in labusers1 group.
-
-			#6
-			#exit
-
-			#7
-			#chmod 660 "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
-
-			#8
-			#su labuser2
-
-			#9
-			#printf "Logic will get you from A to Z; imagination will get you everywhere." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/einstein.txt"
-			#Will be denied, labuser2 not in labusers1 group.
-
-			#10
-			#exit
-
-			#12
-			#find -type f -user labuser2
-
-			#13
-			#printf "This must be gravity!" >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
-
-			#14
-			#su labuser2
-
-			#15
-			#printf "Nature is pleased with simplicity. And nature is no dummy." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/newton.txt"
-
-			#16
-			#exit
-
-			#17
-			#printf "Any man whose errors take ten years to correct is quite a man." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/oppenheimer.txt"
-			#printf "Any man whose errors take ten years to correct is quite a man." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
-			#Will be denied for hawking.txt, labuser3 is not in the labusers1 group.
-
-			#18
-			#su labuser2
-
-			#19
-			#chmod 660 "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
-
-			#20
-			#exit
-
-			#21
-			#printf "People who boast about their I.Q. are losers." >> "$l_WORKING_DIRECTORY/LAB09-02/Physicists/hawking.txt"
-
-			#22
-			#id -G labuser3
-
-			#23
-			#id -G labuser2
-
-			#24
-			#cat physicists-list
-
-			#25
-			#./physicists-list
-
-			#26
-			#chmod +x physicists-list
-			#./physicists-list
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -3017,7 +2609,7 @@ function chapter_9 ()
 
 			# SET PERMISSIONS FOR FOLDERS AND FILES
 			chmod 00660 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
-			chmod 00755 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/."
+			chmod 00757 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/."
 			chown labuser3:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Physicists"
 
 			# Einstein is editable by labuser3 then labuser2 after security change.
