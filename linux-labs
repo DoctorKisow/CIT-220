@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# linux-labs - A script used to download, setup and grade the CIT-220 lab
-# enviornment in my CIT-220 Linux System Administration classes.
+# linux-labs - A script used to download, setup and grade the CIT-220 labenviornment in my CIT-220 Linux System Administration classes.
 # Copyright (c) 2022-2023 Dr. Matthew Kisow <mkisow@ccac.edu>
 #
 # License (GPL v3.0)
@@ -74,7 +73,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.29"
+g_VERSION="0.0.30"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -141,7 +140,6 @@ function script_banner ()
 	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
 	printf -- "--------------------------------------------------------------------------------\n"
 }
-
 # (info) - Function for formatted informational messages.
 function info ()
 {
@@ -547,6 +545,57 @@ function create_lab ()
 
 	# Return the lab number.
 	echo $l_LAB
+}
+
+# (capture_commands) - Passed arguements ($1) the lab user ($2) the working directory.
+function capture_commands ()
+{
+	# For this function to work correctly the "labusers1" group must have rw on ALL chapter folders.
+	local l_LABUSER="labuser$1"
+	local l_LABUSER_HIST="/home/$l_LABUSER/.bash_history"
+	local l_WORKING_DIRECTORY="$2"
+	local l_HIST_FILE="/home/labuser1/command-history.txt"
+
+	# Grading can only be done from the labuser1 account.
+	if [ $EUID -ne 501 ]; then
+		warning "Login or switch to the labuser1 account to grade this lab."
+		cleanup_and_exit_with_code 1
+	fi
+
+	# Cleanup any previous grading residue.
+	if [ -e $l_WORKING_DIRECTORY/command-history.txt ]; then
+		rm $l_WORKING_DIRECTORY/command-history.txt
+	fi
+
+	info "Capturing command history for $l_LABUSER."
+	printf "\n\n# Command history capture for: $l_LABUSER.\n" >> $l_HIST_FILE
+	if [ "$l_LABUSER" == "labuser1" ]; then
+		history >> $l_HIST_FILE
+		sed -i 's/^ *[0-9]\+..//g' $l_HIST_FILE
+
+		info "  Merging the command history file."
+		cat $l_HIST_FILE >> $l_WORKING_DIRECTORY/$l_HIST_FILE
+		if [ -e $l_HIST_FILE ]; then
+			rm $l_HIST_FILE
+		fi
+
+		info "  Truncating command history for $l_LABUSER."
+		sed -i '/^/d' /home/$l_LABUSER/.bash_history
+	else
+		echo 'P@$$w0rd' | sudo -S -k cat $l_LABUSER_HIST >> $l_HIST_FILE 2>&1
+
+		info "  Merging the command history file."
+		echo 'P@$$w0rd' | sudo -S -k cat $l_HIST_FILE >> $l_WORKING_DIRECTORY/$l_HIST_FILE 2>&1
+		if [ -e $l_HIST_FILE ]; then
+			rm $l_HIST_FILE
+		fi
+
+		info "  Truncating command history for $l_LABUSER."
+		echo 'P@$$w0rd' | sudo -S -k sed -i '/^/d' /home/$l_LABUSER/.bash_history >/dev/null 2>&1
+
+		info "  Cleaning up command history file."
+		sed -i '/\[sudo\].*/d' $l_WORKING_DIRECTORY/command-history.txt
+	fi
 }
 
 # (backup_lab) - Passed arguements ($1) the chapter number.
@@ -1153,12 +1202,14 @@ function chapter_4 ()
 }
 
 # CH05 - Managing System Services
+#        Lab Validated: 06-JUN-2023
 function chapter_5 ()
 {
 	local l_OPER="$1"
 	local l_CH_NUM="$2"
 	local l_WORKING_DIRECTORY=""
 	local l_LAB=""
+	local l_HIST_FILE=""
 
 	# Verify the function was passed the correct operation.
 	if ! [[ $l_OPER =~ ^(-c|-g|-i|-r)$ ]]; then
@@ -1175,8 +1226,61 @@ function chapter_5 ()
 		-g)
 			info "Grading the lab(s) for chapter: $l_CH_NUM."
 
+			info "  Getting working directory for chapter $l_CH_NUM."
 			l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
-			history > "$l_WORKING_DIRECTORY/$l_LAB-cmd_history.txt"
+
+			capture_commands 1 $l_WORKING_DIRECTORY
+
+			#1
+			if grep -q "systemctl status ssh" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "systemctl status ssh - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+
+				# If this command is supposed to be run on multiple occurances, then remove the first.
+				sed -i '0,/^systemctl status ssh/{//d;}' $l_WORKING_DIRECTORY/command-history.txt
+			else
+				warning "systemctl status ssh - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
+
+			#2
+			if grep -q "sudo systemctl enable ssh" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "sudo systemctl enable ssh - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			else
+				warning "sudo systemctl enable ssh - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
+
+			#3
+			if grep -q "systemctl status ssh" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "systemctl status ssh - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+
+				# If this command is supposed to be run on multiple occurances, then remove the first.
+				sed -i '0,/^systemctl status ssh/{//d;}' $l_WORKING_DIRECTORY/command-history.txt
+			else
+				warning "systemctl status ssh - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
+
+			#4
+			if grep -q "sudo systemctl start ssh" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "sudo systemctl start ssh - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			else
+				warning "sudo systemctl start ssh - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
+
+			#5
+			if grep -q "systemctl status ssh" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "systemctl status ssh - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+
+				# If this command is supposed to be run on multiple occurances, then remove the first.
+				sed -i '0,/^systemctl status ssh/{//d;}' $l_WORKING_DIRECTORY/command-history.txt
+			else
+				warning "systemctl status ssh - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
+
+			#6
+			if grep -q "runlevel" $l_WORKING_DIRECTORY/command-history.txt; then
+				info "runlevel - found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			else
+				warning "runlevel - not found!" >> $l_WORKING_DIRECTORY/grading-$l_CH_NUM.txt
+			fi
 
 			#ANSWERS CH05-01
 
@@ -1261,6 +1365,7 @@ function chapter_5 ()
 }
 
 # CH06 - System Performance
+#        Lab Validated: 06-JUN-2023
 function chapter_6 ()
 {
 	local l_OPER="$1"
@@ -1295,19 +1400,25 @@ function chapter_6 ()
 			#3
 			#free --lohi
 
+			#4
+			#./lab06-01.sh &
+
 			#5
 			#ps -A | grep lynx
 
 			#6
-			#pstree lynx
+			#pstree | grep lynx
 
 			#7
-			#ps -A | grep lab6-01.sh
+			#ps -A | grep lab06-01.sh
 
 			#8
 			#kill -9 <PID>
-			#ps -A | grep lab6-01.sh
-			#ps -A | grep lynx
+			#pstree | grep lynx
+			#ps -A | grep lab06-01.sh
+
+			#9
+			#./lab06-01.sh &
 
 			#10
 			#a. ps -A | grep lynx
@@ -1317,6 +1428,9 @@ function chapter_6 ()
 			#f. killall -9 lynx
 			#h. kill -9 <PID> (SCRIPT PID)
 
+			#11
+			#./lab06-01.sh &
+
 			#12
 			#top
 			#u
@@ -1324,15 +1438,16 @@ function chapter_6 ()
 			#q
 
 			#13
-			#ps aux | grep lab6-01.sh
+			#ps aux | grep lab06-01.sh
 
 			#14
-			#renice <PID> 5
+			#sudo renice 5 <PID>
 
 			#15
-			#ps aux | grep lab6-01.sh
+			#ps aux | grep lab06-01.sh
 
 			#16
+			#top
 			#u
 			#labuser1
 			#k
@@ -1499,6 +1614,7 @@ function chapter_6 ()
 }
 
 # CH07 - File Manipulation
+#        Lab Validated: 06-JUN-2023
 function chapter_7 ()
 {
 	local l_OPER="$1"
@@ -1524,30 +1640,55 @@ function chapter_7 ()
 			cleanup_and_exit_with_code 1
 
 			#ANSWERS LAB07-01
+			#1
+			#tree /labs/CH07
+
+			#2
+			#Answer Questions
+
+			#3
+			#ls -li "Hikaru Sulu"
+			#ls -li "Montgomery Scott"
+
+			#4
+			#ls -li "Christopher Pike/USS Enterprise"
+			#ls -li "James T. Kirk/USS Enterprise"
+
+			#5
+			#NOTE: MUST BE RELATIVE PATH!
+			#ln -s ../James\ T.\ Kirk/USS\ Enterprise-A "USS Enterprise-A"
+
+			#6
+			#touch -d 01/01/2288 "labs/CH07/Nyota Uhura/USS Leondegrance"
+			
 			#7
 			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
 			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel"
 			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans"
 			#mkdir "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Officers"
 
+			#8
+			#rm -r "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel"
+
 			#9
-			#mkdir -p "$l_WORKING_DIRECTORY/numbered/{1..9}/{1..9}"
+			#mkdir -p /labs/CH07/numbered/{1 .. 9}/{1 .. 9}
 
 			#10
 			#diff -q "$l_WORKING_DIRECTORY/numbered/1" "$l_WORKING_DIRECTORY/numbered/3"
 
+			#11
+			#mkdir -p /labs/CH07/Starfleet\ Federation/Personnel/{Capitans,Officers}
+
 			#12
+			#mv "Christopher\ Pike/ Starfleet\ Federation/Personnel/Capitans/
+			#mv Hikaru\ Sulu/ Starfleet\ Federation/Personnel/Capitans/
+			#mv James\ T.\ Kirk/ Starfleet\ Federation/Personnel/Capitans/
+			#mv Montgomery\ Scott/ Starfleet\ Federation/Personnel/Capitans/
+			#mv Nyota\ Uhura Starfleet\ Federation/Personnel/Capitans/
+
+			#13
 			# Soft Link Enterprise-A from JTK (Done In Lab).
 			#ln -s "$g_LAB_PATH/$l_WORKING_DIRECTORY/James T. Kirk/USS Enterprise-A" "$l_WORKING_DIRECTORY/Montgomery Scott/USS Enterprise-A"
-
-			# Move Capitans to Capitans (Done In Lab)
-			#mv "$l_WORKING_DIRECTORY/Christopher Pike" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
-			#mv "$l_WORKING_DIRECTORY/James T. Kirk" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
-			#mv "$l_WORKING_DIRECTORY/Montgomery Scott" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
-			#mv "$l_WORKING_DIRECTORY/Hikaru Sulu" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
-			#mv "$l_WORKING_DIRECTORY/Nyota Uhura" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/"
-			#rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/James T. Kirk/USS Enterprise"
-			#rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
 
 			# USS Discovery
 			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Christopher Pike/USS Discovery" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/"
@@ -1565,22 +1706,23 @@ function chapter_7 ()
 			# USS Excelsior
 			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
 			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Montgomery Scott/"
+			#rm "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/USS Excelsior"
 			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Excelsior" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Hikaru Sulu/"
 
 			# USS Leondegrance
 			#mv "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships"
 			#ln -s "$l_WORKING_DIRECTORY/Starfleet Federation/Federation Ships/USS Leondegrance" "$l_WORKING_DIRECTORY/Starfleet Federation/Personnel/Capitans/Nyota Uhura/"
 
-			#13
+			#14
 			#find /labs/CH07/difference/ -name *.txt | tree
 
-			#14
+			#15
 			#find /labs/CH07/difference/ -name *.html -exec grep -iw Hello {} \;
 			#find /labs/CH07/difference/ -name *.html -exec grep -iw Zeus {} \;
 			#find /labs/CH07/difference/ -name *.html -exec grep -iw Aphrodite {} \;
 			#find /labs/CH07/difference/ -name *.html -exec grep -iw "<head>" {} \;
 
-			#15
+			#16
 			#find /labs/CH07/difference/ -name *.txt -exec grep -iw fox {} \;
 			#find /labs/CH07/difference/ -name *.txt -exec grep -iw 7h3 {} \;
 			;;
@@ -1785,6 +1927,7 @@ function chapter_7 ()
 }
 
 # CH08 - File Processing
+#        Lab Validated: 07-JUN-2023
 function chapter_8 ()
 {
 	local l_OPER="$1"
@@ -1809,7 +1952,55 @@ function chapter_8 ()
 			info "There is no grading module available for lab: $l_LAB."
 			cleanup_and_exit_with_code 1
 
-			#Answers
+			#ANSWERS LAB08-01
+			#1
+			#cat frankenstein-letter.txt
+
+			#2
+			#tac frankenstein-letter.txt
+
+			#3
+			#more frankenstein-letter.txt
+
+			#4
+			#less frankenstein-letter.txt
+
+			#5
+			#nl frankenstein-letter.txt | more #ANSWER: made
+
+			#6
+			#head frankenstein-letter.txt
+
+			#7
+			#tail frankenstein-letter.txt
+
+			#8
+			#head -n 40 frankenstein-letter.txt | tail -n 10
+
+			#9
+			#cat wizard-names.txt
+
+			#10
+			#sort wizard-names.txt
+
+			#11
+			#sort wizard-names.txt -k 2
+
+			#12
+			#cat numbers.txt
+
+			#13
+			#sort numbers.txt
+
+			#14
+			#sort numbers.txt -n
+
+			#15
+			#cat starfleet-ships.txt
+
+			#15a
+			#ANSWER: In comma delimited format.
+
 			#15b
 			#awk -F ',' '{print $3,$2,$1}' starfleet-ships.txt
 
@@ -1823,19 +2014,51 @@ function chapter_8 ()
 			#awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' starfleet-ships.txt | sort -V | grep "Enterprise"
 
 			#15f
+			#NOTE: Either answer is correct.
 			#awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c
+			#awk -F ',' '{print $1}' starfleet-ships.txt | sort | uniq -c | grep unknown
 
 			#15g
 			#tr [:lower:] [:upper:] < starfleet-ships.txt | awk -F ',' '{printf "%-15s %-20s %-20s \n", $3,$2,$1}' | sort -V
 
+			#16
+			#cat lorem-ipsum.txt
+
+			#16a
+			#OBSERVATION
+
 			#16b
 			#sed -e 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
+
+			#17
+			#cat lorem-ipsum.txt
+
+			#17a
+			#OBSERVATION
 
 			#17b
 			#sed -i 's/niap/pain/g ; s/hcihw/which/g ; s/dna/and/g ; s/secnatsmucric/circumstances/g' lorem-ipsum.txt
 
+			#18
+			#cat written-numbers.txt
+
+			#19
+			#cat written-numbers-search.txt
+
 			#20
 			#fgrep -f written-numbers-search.txt written-numbers.txt
+
+			#21
+			#ANSWER: USE VIM, MODIFY FILE
+
+			#22
+			#cat wizard-names.txt
+
+			#23
+			#ANSWER: USE VIM, MODIFY FILE
+
+			#24
+			#cat wizard-names.txt
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
@@ -1845,8 +2068,8 @@ function chapter_8 ()
 			l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
 			info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-			#chown root:labusers1 $l_WORKING_DIRECTORY
-			chmod 02754 "$l_WORKING_DIRECTORY"
+			#This directory needs to be writable for #17 and #21.
+			chmod 02774 "$l_WORKING_DIRECTORY"
 
 			# CREATE LAB - SET PERMISSIONS
 			info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
@@ -1865,7 +2088,7 @@ function chapter_8 ()
 
 			# Apply crontab entry for hwsnbn.sh.
 			info "   Applying new hwsnbn.sh entry to crontab."
-			sed -i "`wc -l < /etc/crontab` i 1  *    * * *   root    /labs/CH08/hwsnbn.sh" /etc/crontab
+			sed -i "`wc -l < /etc/crontab` i */1  *    * * *   root    /labs/CH08/hwsnbn.sh" /etc/crontab
 
 			# frankenstein letter
 			cat > "$l_WORKING_DIRECTORY/frankenstein-letter.txt" <<-EOF
@@ -2009,6 +2232,9 @@ function chapter_8 ()
 			R. Walton
 			EOF
 
+			#Students will not be permitted to edit this file.
+			chmod 644 "$l_WORKING_DIRECTORY/frankenstein-letter.txt"
+
 			# lorem-ipsum
 			cat > "$l_WORKING_DIRECTORY/lorem-ipsum.txt" <<-EOF
 			Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
@@ -2024,6 +2250,9 @@ function chapter_8 ()
 
 			Roman Philosopher, Cicero
 			EOF
+
+			#Change permissions for the changes under the sed command #17
+			chmod 664 "$l_WORKING_DIRECTORY/lorem-ipsum.txt"
 
 			# numbers
 			cat > "$l_WORKING_DIRECTORY/numbers.txt" <<-EOF
@@ -2048,6 +2277,9 @@ function chapter_8 ()
 			100
 			91
 			EOF
+
+			#Students will not be permitted to edit this file.
+			chmod 644 "$l_WORKING_DIRECTORY/numbers.txt"
 
 			# starfleet-ships
 			cat > "$l_WORKING_DIRECTORY/starfleet-ships.txt" <<-EOF
@@ -2331,6 +2563,9 @@ function chapter_8 ()
 			Miranda-class,USS Nautilus,NCC-31910
 			EOF
 
+			#Students will not be permitted to edit this file.
+			chmod 644 "$l_WORKING_DIRECTORY/starfleet-ships.txt"
+
 			# wizard-names
 			cat > "$l_WORKING_DIRECTORY/wizard-names.txt" <<-EOF
 			Harry Potter
@@ -2347,8 +2582,8 @@ function chapter_8 ()
 			Newt Scamander
 			EOF
 
-			# Change permissions for the changes under the VIM command #21
-			chmod 554 "$l_WORKING_DIRECTORY/wizard-names.txt"
+			#Change permissions for the changes under the VIM command #21
+			chmod 664 "$l_WORKING_DIRECTORY/wizard-names.txt"
 
 			# written-numbers
 			cat > "$l_WORKING_DIRECTORY/written-numbers.txt" <<-EOF
@@ -2364,6 +2599,9 @@ function chapter_8 ()
 			ten
 			EOF
 
+			##Students will not be permitted to edit this file.
+			chmod 644 "$l_WORKING_DIRECTORY/written-numbers.txt"
+
 			# written-numbers-search
 			cat > "$l_WORKING_DIRECTORY/written-numbers-search.txt" <<-EOF
 			one
@@ -2371,6 +2609,9 @@ function chapter_8 ()
 			eight
 			twenty
 			EOF
+
+			##Students will not be permitted to edit this file.
+			chmod 644 "$l_WORKING_DIRECTORY/written-numbers-search.txt"
 
 			# CREATE LAB - SET PERMISSIONS
 			cat > "$l_WORKING_DIRECTORY/$l_LAB" <<-EOF
@@ -2486,7 +2727,7 @@ function chapter_8 ()
 
 			info "  Setting the ownership and permissions for lab number: $l_LAB."
 			chown root:labusers1 "$l_WORKING_DIRECTORY/$l_LAB"
-			chmod 744 "$l_WORKING_DIRECTORY/$l_LAB"
+			chmod 644 "$l_WORKING_DIRECTORY/$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -4276,13 +4517,13 @@ function chapter_22 ()
 
 			#ANSWERS LAB21-01
 			#2
-			#iptables -A INPUT -p icmp -j DROP
+			#sudo iptables -A INPUT -p icmp -j DROP
 
 			#3
-			#iptables -D INPUT -p icmp -j DROP
+			#sudo iptables -D INPUT -p icmp -j DROP
 
 			#EXTRA
-			#iptables -A INPUT -p tcp --dport 22 -j DROP
+			#sudo iptables -A INPUT -p tcp --dport 22 -j DROP
 			;;
 		-i)
 			info "Setting up the labs for chapter: $l_CH_NUM."
