@@ -132,7 +132,8 @@ declare g_INSTALL_DATE=""
 function script_banner ()
 {
 	printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
-	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}, ${g_AUTHOR_TEXT}\n${g_RESET_ATTS}"
+	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}${g_RESET_ATTS}\n"
+	printf "${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>${g_RESET_ATTS}\n"
 	printf -- "--------------------------------------------------------------------------------\n"
 }
 
