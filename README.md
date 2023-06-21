@@ -6,11 +6,11 @@ Dr. Matthew Kisow <mkisow@ccac.edu>
 
 ## Tasks
 - [ ] LAB01-01 - Student Install
-- [ ] LAB07-01 - RESET AND GRADING MODULE
 - [ ] LAB13-01 - (ssh)
 - [ ] LAB17-01 - (lsmod)
 - [ ] LAB23-01 - Network Troubleshooting
 - [ ] LAB29-01 - Chroot on Apache Server
+- [ ] RESET AND GRADING MODULES FOR ALL LABS
 
 ## Installation
 1. Following the instructions for your distribution, install git.
