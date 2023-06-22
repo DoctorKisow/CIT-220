@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.45"
+g_VERSION="0.0.46"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -728,7 +728,7 @@ function lab_profile ()
 	fi
 }
 
-# (lab_readme) - Place a readme.txt file in each directory with information on where to find the lab. Passed arguements ($1) the lab number ($2) optional sets increment.
+# (lab_readme) - Place a README file in each directory with information on where to find the lab. Passed arguements ($1) the lab number ($2) optional sets increment.
 function lab_readme ()
 {
 	# (l_WORKING_DIRECTORY) - Local string used to hold the working directory passed in from $1.
@@ -1633,7 +1633,7 @@ function chapter_1 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -1689,7 +1689,7 @@ function chapter_2 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -1745,7 +1745,7 @@ function chapter_3 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -1801,7 +1801,7 @@ function chapter_4 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -1914,7 +1914,7 @@ function chapter_5 ()
 			systemctl disable ssh 2>/dev/null
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -1979,7 +1979,7 @@ function chapter_6 ()
 			chmod 00750 "$l_WORKING_DIRECTORY/lab06-01.sh"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -2099,7 +2099,7 @@ function chapter_7 ()
 			chmod 00755 -R "$l_WORKING_DIRECTORY"/*
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -2690,7 +2690,7 @@ function chapter_8 ()
 			chmod 644 "$l_WORKING_DIRECTORY/written-numbers-search.txt"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			reset_permissions_check
@@ -2791,7 +2791,7 @@ function chapter_9 ()
 			chown labuser1:labusers1 -R "$l_WORKING_DIRECTORY/$l_LAB/Constellations"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 
 			# CREATE LAB09-02 - SET PERMISSIONS
 			# Set the lab number variable LAB09-02.
@@ -2846,7 +2846,7 @@ function chapter_9 ()
 			chown labuser2:labusers2 "$l_WORKING_DIRECTORY/$l_LAB/Physicists/oppenheimer.txt"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -2902,7 +2902,7 @@ function chapter_10 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -2977,7 +2977,7 @@ function chapter_11 ()
 			rm -r "$l_WORKING_DIRECTORY/Pittsburgh Zoo/"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3049,7 +3049,7 @@ function chapter_12 ()
 			test_group finance
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 
 			# CREATE LAB - SET PERMISSIONS
 			# Set the lab number variable LAB12-02.
@@ -3095,7 +3095,7 @@ function chapter_12 ()
 			chmod 02770 "$l_WORKING_DIRECTORY/$l_LAB-Q"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3151,7 +3151,7 @@ function chapter_13 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3207,7 +3207,7 @@ function chapter_14 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3263,7 +3263,7 @@ function chapter_15 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3317,7 +3317,7 @@ function chapter_16 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3373,7 +3373,7 @@ function chapter_17 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3438,7 +3438,7 @@ function chapter_18 ()
 			wipefs /dev/sdc --all --force --quiet
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3533,7 +3533,7 @@ function chapter_19 ()
 			sgdisk --zap /dev/sde >> /dev/nul
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 
 			# CREATE LAB - SET PERMISSIONS
 			# Set the lab number variable LAB19-02.
@@ -3566,7 +3566,7 @@ function chapter_19 ()
 			fi
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3622,7 +3622,7 @@ function chapter_20 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3678,7 +3678,7 @@ function chapter_21 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3733,7 +3733,7 @@ function chapter_22 ()
 			iptables -F
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3789,7 +3789,7 @@ function chapter_23 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3847,7 +3847,7 @@ function chapter_24 ()
 			chmod 770 "$l_WORKING_DIRECTORY/lab2401.sh"
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3902,7 +3902,7 @@ function chapter_25 ()
 			ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime 
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -3956,7 +3956,7 @@ function chapter_26 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -4012,7 +4012,7 @@ function chapter_27 ()
 			git clone https://github.com/DoctorKisow/lsRules.git &>/dev/null
 
 			# WRITE CHAPTER/LAB README
-			lab_readme $l_WORKING_DIRECTORY $l_LAB
+			lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -4068,7 +4068,7 @@ function chapter_28 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
@@ -4124,7 +4124,7 @@ function chapter_29 ()
 			# ...
 
 			# WRITE CHAPTER/LAB README
-			#lab_readme $l_WORKING_DIRECTORY $l_LAB
+			#lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
 			;;
 		-r)
 			info "Resetting Lab: $l_CH_NUM."
