@@ -838,6 +838,10 @@ function uninstall ()
 		test_user labuser5
 		test_group labusers5
 
+		# Chapter 12 (MOTD)
+		info "  Cleaning up the /etc/motd file."
+		sed -i -e '/This is a private system used for the Linux System Administration CIT-220 class./d' /etc/motd
+
 		# Chapter 12 (Remove Quota Disk)
 		if $(mount | grep -qw /dev/sdb1); then
 			info "  Unmounting the quota disk /dev/sdb1"
