@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.44"
+g_VERSION="0.0.45"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -1239,11 +1239,8 @@ function base ()
 	# Create Virtual Machine Maintenance Scripts
 	info "Deploying maintenance scripts."
 
-	# Ignore error when adding maintenance scripts, due to unbound variables in glob.
-	set +e
-	set +u
-
 	# (machine-id.sh) - A script to reset GUID of a VM that was not properly reset during creation.
+	info "  Creating the machine-id.sh maintenance script."
 	cat > "/root/machine-id.sh" <<-EOF
 	#!/bin/bash
 	#${g_COPYRIGHT_TEXT}
@@ -1256,33 +1253,38 @@ function base ()
 	init 0
 	EOF
 
+	info "  Setting the ownership and permissions for the machine-id.sh maintenance script."
+	chown root:root "/root/machine-id.sh"
+	chmod 775 "/root/machine-id.sh"
+
 	# (reset-labuser1.sh) - A script to reset the labuser1 user to system defaults.
-	cat > "/root/reset-labuser1.sh" <<-EOF
+	info "  Creating the reset-labuser1.sh maintenance script."
+	cat > "/root/reset-labuser1.sh" << 'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	function test_user ()
 	{
-		# (l_USER) - Local string value used to hold the username passed in from $1.
-		local l_USER="$1"
+		# (l_USER) - Local string value used to hold the username passed in from \$1.
+		local l_USER="\$1"
 
-		if id -u "$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "$l_USER" >> /dev/null 2>&1
+		if id -u "\$l_USER" >/dev/null 2>&1; then
+			userdel -r -f "\$l_USER" >> /dev/null 2>&1
 		fi
 
-		if [ $(getent group $l_USER) ]; then
+		if [ \$(getent group \$l_USER) ]; then
 			groupdel $l_USER
 		fi
 	}
 
 	function test_group ()
 	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-		local l_GROUP="$1"
+		# (l_GROUP) - Local string value used to hold the group name passed in from \$1.
+		local l_GROUP="\$1"
 
-		if [ $(getent group $l_GROUP) ]; then
-			groupdel $l_GROUP
+		if [ \$(getent group \$l_GROUP) ]; then
+			groupdel \$l_GROUP
 		fi
 	}
 
@@ -1295,13 +1297,20 @@ function base ()
 	usermod -g labusers1 labuser1 &>/dev/null
 	chown labuser1:labusers1 /home/labuser1
 	echo 'labuser1:P@$$w0rd' | chpasswd
-	EOF
+EOF
+
+	sed -i -e 's/^\t//g' reset-labuser1.sh
+	info "  Setting the ownership and permissions for the reset-labuser1.sh maintenance script."
+	chown root:root "/root/reset-labuser1.sh"
+	chmod 775 "/root/reset-labuser1.sh"
+
 
 	# (reset-labuser2.sh) - A script to reset the labuser2 user to system defaults.
-	cat > "/root/reset-labuser2.sh" <<-EOF
+	info "  Creating the reset-labuser2.sh maintenance script."
+	cat > "/root/reset-labuser2.sh" << 'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	function test_user ()
 	{
@@ -1335,13 +1344,19 @@ function base ()
 	useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
 	chown labuser2:labusers2 /home/labuser2
 	echo 'labuser2:P@$$w0rd' | chpasswd
-	EOF
+EOF
+
+	sed -i -e 's/^\t//g' reset-labuser2.sh
+	info "  Setting the ownership and permissions for the reset-labuser2.sh maintenance script."
+	chown root:root "/root/reset-labuser2.sh"
+	chmod 775 "/root/reset-labuser2.sh"
 
 	# (reset-labuser3.sh) - A script to reset the labuser3 user to system defaults.
-	cat > "/root/reset-labuser3.sh" <<-EOF
+	info "  Creating the reset-labuser3.sh maintenance script."
+	cat > "/root/reset-labuser3.sh" << 'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	function test_user ()
 	{
@@ -1375,13 +1390,19 @@ function base ()
 	useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
 	chown labuser3:labusers3 /home/labuser3
 	echo 'labuser3:P@$$w0rd' | chpasswd
-	EOF
+EOF
+
+	sed -i -e 's/^\t//g' reset-labuser3.sh
+	info "  Setting the ownership and permissions for the reset-labuser3.sh maintenance script."
+	chown root:root "/root/reset-labuser3.sh"
+	chmod 775 "/root/reset-labuser3.sh"
 
 	# (reset-labuser4.sh) - A script to reset the labuser4 user to system defaults.
-	cat > "/root/reset-labuser4.sh" <<-EOF
+	info "  Creating the reset-labuser4.sh maintenance script."
+	cat > "/root/reset-labuser4.sh" << 'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	function test_user ()
 	{
@@ -1417,13 +1438,19 @@ function base ()
 
 	useradd --comment "Lab User 4" --create-home --no-user-group --gid 1001 --groups labusers1,sudo --shell /bin/false labuser4
 	echo 'labuser4:P@$$w0rd' | chpasswd
-	EOF
+EOF
+
+	sed -i -e 's/^\t//g' reset-labuser4.sh
+	info "  Setting the ownership and permissions for the reset-labuser4.sh maintenance script."
+	chown root:root "/root/reset-labuser4.sh"
+	chmod 775 "/root/reset-labuser4.sh"
 
 	# (reset-labuser5.sh) - A script to reset the labuser5 user to system defaults.
-	cat > "/root/reset-labuser5.sh" <<-EOF
+	info "  Creating the reset-labuser5.sh maintenance script."
+	cat > "/root/reset-labuser5.sh" << 'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	function test_user ()
 	{
@@ -1454,22 +1481,33 @@ function base ()
 
 	useradd --comment "Lab User 5" --create-home --user-group --groups labusers1 --shell /bin/bash labuser5
 	echo 'labuser5:P@$$w0rd' | chpasswd
-	EOF
+EOF
+
+	sed -i -e 's/^\t//g' reset-labuser5.sh
+	info "  Setting the ownership and permissions for the reset-labuser5.sh maintenance script."
+	chown root:root "/root/reset-labuser5.sh"
+	chmod 775 "/root/reset-labuser5.sh"
 
 	# (reset-nic.sh) - A script to reset the network card.
-	cat > "/root/reset-nic.sh" <<-EOF
+	info "  Creating the reset-nic.sh maintenance script."
+	cat > "/root/reset-nic.sh" <<-'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	ip addr flush dev ens160
 	EOF
 
+	info "  Setting the ownership and permissions for the reset-nic.sh maintenance script."
+	chown root:root "/root/reset-nic.sh"
+	chmod 775 "/root/reset-nic.sh"
+
 	# (template-prep.sh) - A script to prepare the virtual machine for cloning.
-	cat > "/root/template-prep.sh" <<-EOF
+	info "  Creating the template-prep.sh maintenance script."
+	cat > "/root/template-prep.sh" <<-'EOF'
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	# Check if script is running as root first
 	if [[ "$(whoami)" != "root" ]]; then
@@ -1520,13 +1558,9 @@ function base ()
 	shutdown -h now
 	EOF
 
-	info "  Setting the ownership and permissions for maintenance scripts."
-	chown root:root "/root/*.sh"
-	chmod 775 "/root/*.sh"
-
-	# Reapply error trapping.
-	set -e
-	set -u
+	info "  Setting the ownership and permissions for the template-prep.sh maintenance script."
+	chown root:root "/root/template-prep.sh"
+	chmod 775 "/root/template-prep.sh"
 
 	# Create script to move installation script to labs directory
 	if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
