@@ -163,7 +163,7 @@ function display_usage_message_and_bail_out ()
 function error ()
 {
 	echo
-	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
+	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR:   ${1} - exiting" >&2
 	cleanup_and_exit_with_code 1
 }
 
@@ -177,7 +177,7 @@ function help ()
 # (info) - Function for formatted informational messages.
 function info ()
 {
-	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
+	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO:    ${1}" >&2
 }
 
 # (internal_consistency_option_checks) - Function used to validate the some of the more obvious configuration file snafus.
@@ -805,7 +805,7 @@ function uninstall ()
 		if [ -f /etc/fstab.bak ]; then
 			mv /etc/fstab{.bak,} &>/dev/null
 		else
-			warning "    The backup copy of the filesystem table no longer exists."
+			warning " The backup copy of the filesystem table no longer exists."
 		fi
 
 		# Remove the lab user(s).
@@ -963,7 +963,7 @@ function uninstall ()
 		#CH16
 		uninstall_package sysstat
 		uninstall_package procinfo
-		unnstall_package ioping
+		uninstall_package ioping
 
 		#CH20
 		uninstall_package network-manager
