@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.33"
+g_VERSION="0.0.34"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -4042,7 +4042,7 @@ function chapter_29 ()
 # *************************** begin of script proper ***************************
 process_command_line_options "${@}"
 internal_consistency_option_checks
-lab_profile
+
 
 # Only clear screen and present script banner when gAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
@@ -4063,6 +4063,8 @@ fi
 
 # GRADE LAB
 if ((g_ARG_GRADE_LAB==1)); then
+	lab_profile
+
 	info "Grading lab: $g_ARG_GRADE..."
 	chapter_$g_ARG_GRADE -g $g_ARG_GRADE
 fi
