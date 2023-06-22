@@ -796,7 +796,7 @@ function uninstall ()
 
 	info "Uninstalling the lab enviornment."
 
-	read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
+	read -r -n 1 -p "             Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
 	printf "\n\n"
 
 	if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
