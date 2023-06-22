@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.34"
+g_VERSION="0.0.35"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -186,43 +186,50 @@ function internal_consistency_option_checks ()
 	while true ; do
 		case "$g_FIRST_TOKEN" in
 			-c)
-				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE)); then
+				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL)); then
 					warning "You cannot change the enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-g)
-				if ((g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
+				if ((g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
 					warning "You cannot grade a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-i)
-				if ((g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+				if ((g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
 					warning "You cannot setup the labs enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-I)
-				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
 					warning "You cannot create or set the lab profile with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-r)
-				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_CHANGE_LAB)); then
+				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB)); then
 					warning "You cannot rollback a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-u)
-				if ((g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
+				if ((g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
 					warning "You cannot update this script with any other options set."
+					cleanup_and_exit_with_code 1
+				fi
+				break
+				;;
+			-U)
+				if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
+					warning "You cannot uninstall the lab enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
@@ -233,12 +240,12 @@ function internal_consistency_option_checks ()
 		if ((g_ARG_PROFILE==0)); then
 			# Exit on unset v_LASTNAME.
 			if [ -z $v_LASTNAME ]; then
-				error "  The v_LASTNAME student profile option cannot be empty."
+				error "  The students last name option cannot be empty."
 			fi
 
 			# Exit on unset v_SECTION.
 			if [ -z $v_SECTION ]; then
-				error "  The v_SECTION student profile option cannot be empty."
+				error "  The students class section option cannot be empty."
 			fi
 		fi
 	done
@@ -1185,6 +1192,10 @@ function base ()
 	# Create Virtual Machine Maintenance Scripts
 	info "Deploying maintenance scripts."
 
+	# Ignore error when adding users, due to manually setting UID/GID.
+	set +e
+	set +u
+
 	# (machine-id.sh) - A script to reset GUID of a VM that was not properly reset during creation.
 	cat > "/root/machine-id.sh" <<-EOF
 	#!/bin/bash
@@ -1465,6 +1476,10 @@ function base ()
 	info "  Setting the ownership and permissions for maintenance scripts."
 	chown root:root "/root/*.sh"
 	chmod 775 "/root/*.sh"
+
+	# Reapply error trapping.
+	set -e
+	set -u
 
 	# Create script to move installation script to labs directory
 	if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
