@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.37"
+g_VERSION="0.0.38"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -885,11 +885,11 @@ function uninstall ()
 			pvremove /dev/sde >> /dev/null 2>&1
 		fi
 
-		info "  Resetting disks /dev/sdd."
+		info "  Resetting disk /dev/sdd."
 		wipefs /dev/sdd --all --force --quiet
 		sgdisk --zap /dev/sdd >> /dev/nul
 
-		info "  Resetting disks /dev/sde."
+		info "  Resetting disk /dev/sde."
 		wipefs /dev/sde --all --force --quiet
 		sgdisk --zap /dev/sde >> /dev/nul
 
@@ -1026,9 +1026,9 @@ function uninstall_package ()
 
 	# Uninstall packages and report error conditions as warning.
 	info "    Uninstalling the $l_package package(s)."
-	uninstall_package  $l_package -qq &>/dev/null
+	apt -y remove $l_package -qq &>/dev/null
 	if [ $? -ne 0 ]; then
-		warning "The $l_package package installation failed with an error condition."
+		warning "The $l_package package uninstallation failed with an error condition."
 	fi
 }
 # *************************** script specific functions ************************
