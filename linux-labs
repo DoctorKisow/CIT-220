@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.32"
+g_VERSION="0.0.33"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -117,6 +117,7 @@ declare -i g_ARG_PROFILE=0
 declare -i g_ARG_FINISH_INSTALL=0
 declare -i g_ARG_ROLLBACK_LAB=0
 declare -i g_ARG_UPDATE=0
+declare -i g_ARG_UNINSTALL=0
 
 declare -i g_ARG_CHANGE=0
 declare -i g_ARG_GRADE=0
@@ -128,35 +129,6 @@ declare g_FIRST_TOKEN=""
 declare g_INSTALL_DATE=""
 
 # **************************** basic script functions **************************
-# (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
-function script_banner ()
-{
-	printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
-	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}${g_RESET_ATTS}\n"
-	printf "${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>${g_RESET_ATTS}\n"
-	printf -- "--------------------------------------------------------------------------------\n"
-}
-
-# (info) - Function for formatted informational messages.
-function info ()
-{
-	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
-}
-
-# (warning) - Function for formatted warning messages.
-function warning ()
-{
-	echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}WARNING: ${1}" >&2
-}
-
-# (error) - Function for the error catching routine, display an error cleanup and exit the script.
-function error ()
-{
-	echo
-	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
-	cleanup_and_exit_with_code 1
-}
-
 # (cleanup_and_exit_with_code) - Function used to properly cleanup the enviornment after an error; the passed value are 1 (error) or 0 (normal).
 function cleanup_and_exit_with_code ()
 {
@@ -176,52 +148,6 @@ function cleanup_and_exit_with_code ()
 	exit $1
 }
 
-# (trap_cleanup) - Function used to set how we want the script to handle any error conditions it encounters and what we want to do once those error conditions are encountered.
-function trap_cleanup ()
-{
-	trap - SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
-	error "Caught signal"
-}
-trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
-
-# (print_usage) - Function used to display the scripts usage and command line options.
-function print_usage ()
-{
-	clear
-	script_banner
-
-	cat << EOF
-
-  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-I] [-r <1-29>]
-                    [-u|--update] [-v]
-  Options:
-	-c                     roll the enviornment forward to a lab [1-29]
-	-g                     grade a completed lab [1-29]
-	-h                     show this help message
-	-i --install           install the lab enviornment
-	-I                     set the students lab profile
-	-r                     roll back a specific lab [1-29]
-	-u --update            update the ${g_PROGNAME} script
-	-v                     display the version number of ${g_PROGNAME} and exit
-EOF
-}
-
-# (help) - Function used to display the scripts usage and command line options.
-function help ()
-{
-	printf "${g_PROGNAME} - ${g_PROGRAM_DESCRIPTION}\n"
-	print_usage
-}
-
-# (print_version) - Function used to print the script version.
-function print_version ()
-{
-	clear
-	script_banner
-
-	printf "%s\n" "${g_VERSION}"
-}
-
 # (display_usage_message_and_bail_out) - Function used to display the usage when an invalid command line option is passed to the script.
 function display_usage_message_and_bail_out ()
 {
@@ -233,60 +159,25 @@ function display_usage_message_and_bail_out ()
 	cleanup_and_exit_with_code 1
 }
 
-# (process_command_line_options) - Function used to set and validate command line options passed to the script.
-function process_command_line_options ()
+# (error) - Function for the error catching routine, display an error cleanup and exit the script.
+function error ()
 {
-	# (l_TEMP) - Local array used to hold the list of command line arguements passed from the cammandline during script execution.
-	local l_TEMP
+	echo
+	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
+	cleanup_and_exit_with_code 1
+}
 
-	# (l_RC) - Local boolean value used to test if any commandline arguements passed from the cammandline during script execution are invalid.
-	declare -i l_RC
+# (help) - Function used to display the scripts usage and command line options.
+function help ()
+{
+	printf "${g_PROGNAME} - ${g_PROGRAM_DESCRIPTION}\n"
+	print_usage
+}
 
-	# Error trapping is turned off because we want to handle errors.
-	set +e
-		l_TEMP="$(getopt -o c:g:hiIr:uvz --long install,update -n "${g_PROGNAME}" -- "${@}")"
-		l_RC="${?}"
-	set -e
-
-	# Check if any invalid options were passed and display help.
-	if ((l_RC!=0)); then
-		display_usage_message_and_bail_out
-	fi
-
-	# No arguements were passed to the script, display help.
-	if [ $# -eq 0 ]; then
-		display_usage_message_and_bail_out
-	fi
-
-	eval set -- "${l_TEMP}"
-
-	for arg in "${@}"; do
-		shift
-		case "$arg" in
-			--install) set -- "$@" '-i' ;;
-			--update)  set -- "$@" '-u' ;;
-			*)         set -- "$@" "$arg" ;;
-		esac
-	done
-
-	# Set the first token for the error message when multiple tol=kens are passed.
-	g_FIRST_TOKEN=${1}
-
-	# Extract the options and their arguments into variables.
-	while true ; do
-		case "${1}" in
-			-c) g_ARG_CHANGE_LAB=1; g_ARG_CHANGE=${2}; (( g_ARG_CHANGE >= 1 && g_ARG_CHANGE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
-			-g) g_ARG_GRADE_LAB=1; g_ARG_GRADE=${2}; (( g_ARG_GRADE >= 1 && g_ARG_GRADE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
-			-h) display_usage_message_and_bail_out ;;
-			-i) g_ARG_INSTALL=1; shift ;;
-			-I) g_ARG_PROFILE=1; shift ;;
-			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
-			-u) g_ARG_UPDATE=1; shift ;;
-			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
-			-z) g_ARG_FINISH_INSTALL=1; shift ;;
-			--) shift; break ;;
-		esac
-	done
+# (info) - Function for formatted informational messages.
+function info ()
+{
+	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
 }
 
 # (internal_consistency_option_checks) - Function used to validate the some of the more obvious configuration file snafus.
@@ -352,6 +243,153 @@ function internal_consistency_option_checks ()
 		fi
 	done
 }
+
+# (print_usage) - Function used to display the scripts usage and command line options.
+function print_usage ()
+{
+	clear
+	script_banner
+
+	cat << EOF
+
+  Usage: ${g_PROGNAME} [-c <1-29>] [-g <1-29>] [-h] [-i|--install] [-I] [-r <1-29>]
+                    [-u|--update] [-U|--uninstall] [-v]
+  Options:
+	-c                     roll the enviornment forward to a lab [1-29]
+	-g                     grade a completed lab [1-29]
+	-h                     show this help message
+	-i --install           install the lab enviornment
+	-I                     set the students lab profile
+	-r                     roll back a specific lab [1-29]
+	-u --update            update the ${g_PROGNAME} script
+	-U --uninstall         uninstall the lab enviornment
+	-v                     display the version number of ${g_PROGNAME} and exit
+EOF
+}
+
+# (print_version) - Function used to print the script version.
+function print_version ()
+{
+	clear
+	script_banner
+
+	printf "%s\n" "${g_VERSION}"
+}
+
+# (process_command_line_options) - Function used to set and validate command line options passed to the script.
+function process_command_line_options ()
+{
+	# (l_TEMP) - Local array used to hold the list of command line arguements passed from the cammandline during script execution.
+	local l_TEMP
+
+	# (l_RC) - Local boolean value used to test if any commandline arguements passed from the cammandline during script execution are invalid.
+	declare -i l_RC
+
+	# Error trapping is turned off because we want to handle errors.
+	set +e
+		l_TEMP="$(getopt -o c:g:hiIr:uvz --long install,update -n "${g_PROGNAME}" -- "${@}")"
+		l_RC="${?}"
+	set -e
+
+	# Check if any invalid options were passed and display help.
+	if ((l_RC!=0)); then
+		display_usage_message_and_bail_out
+	fi
+
+	# No arguements were passed to the script, display help.
+	if [ $# -eq 0 ]; then
+		display_usage_message_and_bail_out
+	fi
+
+	eval set -- "${l_TEMP}"
+
+	for arg in "${@}"; do
+		shift
+		case "$arg" in
+			--install)   set -- "$@" '-i' ;;
+			--uninstall) set -- "$@" '-U' ;;
+			--update)    set -- "$@" '-u' ;;
+			*)           set -- "$@" "$arg" ;;
+		esac
+	done
+
+	# Set the first token for the error message when multiple tokens are passed.
+	g_FIRST_TOKEN=${1}
+
+	# Extract the options and their arguments into variables.
+	while true ; do
+		case "${1}" in
+			-c) g_ARG_CHANGE_LAB=1; g_ARG_CHANGE=${2}; (( g_ARG_CHANGE >= 1 && g_ARG_CHANGE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-g) g_ARG_GRADE_LAB=1; g_ARG_GRADE=${2}; (( g_ARG_GRADE >= 1 && g_ARG_GRADE <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-h) display_usage_message_and_bail_out ;;
+			-i) g_ARG_INSTALL=1; shift ;;
+			-I) g_ARG_PROFILE=1; shift ;;
+			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-u) g_ARG_UPDATE=1; shift ;;
+			-U) g_ARG_UNINSTALL=1; shift;;
+			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
+			-z) g_ARG_FINISH_INSTALL=1; shift ;;
+			--) shift; break ;;
+		esac
+	done
+}
+
+# (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
+function script_banner ()
+{
+	printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
+	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}${g_RESET_ATTS}\n"
+	printf "${g_CYAN_TEXT}${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>${g_RESET_ATTS}\n"
+	printf -- "--------------------------------------------------------------------------------\n\n"
+
+	if ((g_ARG_UPDATE==0)); then
+		update_notice
+	fi
+}
+
+# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
+function set_error_trapping ()
+{
+	# (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
+	l_BOOL='^[0-1]+$'
+	if ! [[ $1 =~ $l_BOOL ]]; then
+		error "Function: set_error_trapping was passed a value that is out of bounds."
+	fi
+
+	# (l_TRAP) - Local boolean value used to enable and disable how the script
+	# behaves when certain error conditions are met.
+	local l_TRAP="${1}"
+
+	if ((l_TRAP == 0)); then
+		# Disable errors when a command exits with a non-zero status.
+		set +e
+
+		# Disable errors on unbound (undefined) variables.
+		set +u
+
+		# Disable allowing filename patterns that match no files to expand to a null
+		# string, rather than themselves.
+		shopt -u nullglob
+	else
+		# Enable exiting immediately if a command exits with a non-zero status.
+		set -e
+
+		# Enable erroring on unbound (undefined) variables.
+		set -u
+
+		# Enable filename patterns that match no files to expand to a null
+		# string, rather than themselves.
+		shopt -s nullglob
+	fi
+}
+
+# (trap_cleanup) - Function used to set how we want the script to handle any error conditions it encounters and what we want to do once those error conditions are encountered.
+function trap_cleanup ()
+{
+	trap - SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
+	error "Caught signal"
+}
+trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
 
 # (update) - Function used to check for and update this script from the repository.
 function update ()
@@ -423,79 +461,65 @@ function update_notice ()
 	rm -f $l_TMP_FILE
 }
 
-# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
-function set_error_trapping ()
+# (warning) - Function for formatted warning messages.
+function warning ()
 {
-	# (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
-	l_BOOL='^[0-1]+$'
-	if ! [[ $1 =~ $l_BOOL ]]; then
-		error "Function: set_error_trapping was passed a value that is out of bounds."
-	fi
-
-	# (l_TRAP) - Local boolean value used to enable and disable how the script
-	# behaves when certain error conditions are met.
-	local l_TRAP="${1}"
-
-	if ((l_TRAP == 0)); then
-		# Disable errors when a command exits with a non-zero status.
-		set +e
-
-		# Disable errors on unbound (undefined) variables.
-		set +u
-
-		# Disable allowing filename patterns that match no files to expand to a null
-		# string, rather than themselves.
-		shopt -u nullglob
-	else
-		# Enable exiting immediately if a command exits with a non-zero status.
-		set -e
-
-		# Enable erroring on unbound (undefined) variables.
-		set -u
-
-		# Enable filename patterns that match no files to expand to a null
-		# string, rather than themselves.
-		shopt -s nullglob
-	fi
+	echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}WARNING: ${1}" >&2
 }
 # **************************** basic script functions **************************
 
 
 # *************************** script specific functions ************************
-# (test_user) - Function used to test for the existence of a user then remove them.
-#               Passes arguements ($1) username.
-function test_user ()
+# (attribute) - Test for and record attributes for the grading module profile. Passed arguements ($1) text string of the attribute you're setting, ($2) attribute text or variable.
+function attribute ()
 {
-	# (l_USER) - Local string value used to hold the username passed in from $1.
-	local l_USER="$1"
+	# The number of arguments passed into the function.
+	l_NUM_ARGS='^[1-2]+$'
 
-	if id -u "$l_USER" >/dev/null 2>&1; then
-		userdel -r -f "$l_USER" >> /dev/null 2>&1
+	# Response from the keyboard.
+	local l_REPLY=""
+
+	# Input response from the keyboard.
+	local l_ATTRIBUTE=""
+
+	if ! [[ $# =~ $l_NUM_ARGS ]]; then
+		error "  Function: attribute was passed a value that is out of bounds.  Did you quote the variable?"
 	fi
 
-	if [ $(getent group $l_USER) ]; then
-		groupdel $l_USER
+	if [ -z "$2" ]; then
+		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is empty." >&2
+		l_REPLY="y"
+	else
+		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is: ${g_WHITE_TEXT}${2}${g_RESET_ATTS}" >&2
 	fi
+
+	if [ -z "$l_REPLY" ]; then
+		read -e -r -s -n 1 -p "                Would you like to change this (y/n): " l_REPLY
+	fi
+
+	if [[ ${l_REPLY} =~ ^[Yy]$ ]]; then
+		while true; do
+			read -r -p "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             Enter the new ${1}: " l_ATTRIBUTE
+			if [ ! -z "$l_ATTRIBUTE" ]; then
+				break
+			fi
+		done
+	else
+		l_ATTRIBUTE="$2"
+	fi
+
+	# Return value to calling function.
+	echo "$l_ATTRIBUTE"
 }
 
-# (test_group) - Function used to test for the existence of a group.
-#                Passes arguements ($1) group name.
-function test_group ()
-{
-	# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-	local l_GROUP="$1"
-
-	if [ $(getent group $l_GROUP) ]; then
-		groupdel $l_GROUP
-	fi
-}
-
-# (create directory) - Create a directory structure for the lab module.
-#                      Passed arguements ($1) the book chapter number.
-function create_directory ()
+# (backup_lab) - Backup a lab before resetting. Passed arguements ($1) the chapter number.
+function backup_lab ()
 {
 	# (l_CH_NUM) - Local string value used to hold the lab directory number passed in from $1.
 	local l_CH_NUM="$1"
+
+	# (l_WORKING_DIRECTORY) - Local string used to hold working directory.
+	local l_WORKING_DIRECTORY=""
 
 	# Verify the function was passed a valid lab number.
 	if ! (( l_CH_NUM >= 1 && l_CH_NUM <= 29 )); then
@@ -508,48 +532,18 @@ function create_directory ()
 	# Set the working directory.
 	l_WORKING_DIRECTORY="$g_LAB_PATH/$g_DIR_PREFIX$l_CH_NUM"
 
-	# Create the directory.
-	if ! [[ -d "$l_WORKING_DIRECTORY" ]]; then
-		mkdir "$l_WORKING_DIRECTORY"
+	info "Backing up the previous \"$l_WORKING_DIRECTORY\" working directory."
+
+	if [ -d "$l_WORKING_DIRECTORY.bak" ]; then
+		info "  Removing the old backup directory."
+		rm -r "$l_WORKING_DIRECTORY.bak" &>/dev/null
 	fi
 
-	# Return the created directories path.
-	echo "$l_WORKING_DIRECTORY"
+	info "  Creating a backup of the \"$l_WORKING_DIRECTORY\" directory."
+	mv "$l_WORKING_DIRECTORY"{,.bak}
 }
 
-# (create_lab) - Create a lab module.
-#                Passed arguements ($1) the lab number ($2) optional sets increment.
-function create_lab ()
-{
-	# (l_CH_NUM) - Local string value used to hold the lab directory number passed in from $1.
-	local l_LAB_NUM="$1"
-
-	# (l_LAB_NUM_INC) - Local string value used to hold the optional increment value for dual chapter labs number passed in from $2.
-	local l_LAB_NUM_INC=${2:-"1"}
-
-	# (l_LAB_NUM) - Local string used for return value.
-	local l_LAB=""
-
-	# Verify the function was passed a valid lab number.
-	if ! (( l_LAB_NUM >= 1 && l_LAB_NUM <= 29 )); then
-		error "Function: was passed an expression that was out of range."
-	fi
-
-	# If we are passed a single digit number, prefix it with a zero.
-	l_LAB_NUM=$(printf '%02d' $((l_LAB_NUM)))
-
-	# If we are passed a single digit number, prefix it with a zero.
-	l_LAB_NUM_INC=$(printf '%02d' $((l_LAB_NUM_INC)))
-
-	# Set the lab number.
-	l_LAB="$g_LAB_PREFIX$l_LAB_NUM-$l_LAB_NUM_INC"
-
-	# Return the lab number.
-	echo $l_LAB
-}
-
-# (capture_commands) - Capture commands from the history file.
-#                      Passed arguements ($1) the lab user ($2) the working directory.
+# (capture_commands) - Capture commands from the history file. Passed arguements ($1) the lab user ($2) the working directory.
 function capture_commands ()
 {
 	# For this function to work correctly the "labusers1" group must have rw on ALL chapter folders.
@@ -600,15 +594,11 @@ function capture_commands ()
 	fi
 }
 
-# (backup_lab) - Backup a lab before resetting.
-#                Passed arguements ($1) the chapter number.
-function backup_lab ()
+# (create directory) - Create a directory structure for the lab module. Passed arguements ($1) the book chapter number.
+function create_directory ()
 {
 	# (l_CH_NUM) - Local string value used to hold the lab directory number passed in from $1.
 	local l_CH_NUM="$1"
-
-	# (l_WORKING_DIRECTORY) - Local string used to hold working directory.
-	local l_WORKING_DIRECTORY=""
 
 	# Verify the function was passed a valid lab number.
 	if ! (( l_CH_NUM >= 1 && l_CH_NUM <= 29 )); then
@@ -621,28 +611,46 @@ function backup_lab ()
 	# Set the working directory.
 	l_WORKING_DIRECTORY="$g_LAB_PATH/$g_DIR_PREFIX$l_CH_NUM"
 
-	info "Backing up the previous \"$l_WORKING_DIRECTORY\" working directory."
-
-	if [ -d "$l_WORKING_DIRECTORY.bak" ]; then
-		info "  Removing the old backup directory."
-		rm -r "$l_WORKING_DIRECTORY.bak" &>/dev/null
+	# Create the directory.
+	if ! [[ -d "$l_WORKING_DIRECTORY" ]]; then
+		mkdir "$l_WORKING_DIRECTORY"
 	fi
 
-	info "  Creating a backup of the \"$l_WORKING_DIRECTORY\" directory."
-	mv "$l_WORKING_DIRECTORY"{,.bak}
+	# Return the created directories path.
+	echo "$l_WORKING_DIRECTORY"
 }
 
-# (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
-function reset_permissions_check ()
+# (create_lab) - Create a lab module. Passed arguements ($1) the lab number ($2) optional sets increment.
+function create_lab ()
 {
-	if [ $EUID -ne 0 ]; then
-		warning "To properly reset this lab you must run the $g_PROGRAM_NAME script using sudo."
-		cleanup_and_exit_with_code 1
+	# (l_CH_NUM) - Local string value used to hold the lab directory number passed in from $1.
+	local l_LAB_NUM="$1"
+
+	# (l_LAB_NUM_INC) - Local string value used to hold the optional increment value for dual chapter labs number passed in from $2.
+	local l_LAB_NUM_INC=${2:-"1"}
+
+	# (l_LAB_NUM) - Local string used for return value.
+	local l_LAB=""
+
+	# Verify the function was passed a valid lab number.
+	if ! (( l_LAB_NUM >= 1 && l_LAB_NUM <= 29 )); then
+		error "Function: was passed an expression that was out of range."
 	fi
+
+	# If we are passed a single digit number, prefix it with a zero.
+	l_LAB_NUM=$(printf '%02d' $((l_LAB_NUM)))
+
+	# If we are passed a single digit number, prefix it with a zero.
+	l_LAB_NUM_INC=$(printf '%02d' $((l_LAB_NUM_INC)))
+
+	# Set the lab number.
+	l_LAB="$g_LAB_PREFIX$l_LAB_NUM-$l_LAB_NUM_INC"
+
+	# Return the lab number.
+	echo $l_LAB
 }
 
-# (install_package) - Install software packages.
-#                     Passed arguements ($1) package name.
+# (install_package) - Install software packages. Passed arguements ($1) package name.
 function install_package ()
 {
 	local l_package="$1"
@@ -652,71 +660,6 @@ function install_package ()
 	apt -y install $l_package -qq &>/dev/null
 	if [ $? -ne 0 ]; then
 		warning "The $l_package package installation failed with an error condition."
-	fi
-}
-
-# (attribute) - Test for and record attributes for the grading module profile.
-#               Passed arguements ($1) text string of the attribute you're setting, ($2) attribute text or variable.
-function attribute ()
-{
-	# The number of arguments passed into the function.
-	l_NUM_ARGS='^[1-2]+$'
-
-	# Response from the keyboard.
-	local l_REPLY=""
-
-	# Input response from the keyboard.
-	local l_ATTRIBUTE=""
-
-	if ! [[ $# =~ $l_NUM_ARGS ]]; then
-		error "  Function: attribute was passed a value that is out of bounds.  Did you quote the variable?"
-	fi
-
-	if [ -z "$2" ]; then
-		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is empty." >&2
-		l_REPLY="y"
-	else
-		echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             The current ${1} is: ${g_WHITE_TEXT}${2}${g_RESET_ATTS}" >&2
-	fi
-
-	if [ -z "$l_REPLY" ]; then
-		read -e -r -s -n 1 -p "                Would you like to change this (y/n): " l_REPLY
-	fi
-
-	if [[ ${l_REPLY} =~ ^[Yy]$ ]]; then
-		while true; do
-			read -r -p "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}             Enter the new ${1}: " l_ATTRIBUTE
-			if [ ! -z "$l_ATTRIBUTE" ]; then
-				break
-			fi
-		done
-	else
-		l_ATTRIBUTE="$2"
-	fi
-
-	# Return value to calling function.
-	echo "$l_ATTRIBUTE"
-}
-
-# (lab_profile) - Create a default lab profile or source the one previously created.
-function lab_profile ()
-{
-	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
-		info "Reading the students lab profile."
-
-		source "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
-	else
-		cat > "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" <<-EOF
-		# The students class section number.
-		v_SECTION=""
-
-		# The students last name.
-		v_LASTNAME=""
-		EOF
-
-		info "  A lab profile file was created at ${g_SCRIPT_PATH}/${g_LAB_PROFILE}."
-		info "  Manually update the students lab profile by running this script again using ${g_PROGNAME} -I"
-		cleanup_and_exit_with_code 0
 	fi
 }
 
@@ -750,8 +693,29 @@ function interactive_lab_profile ()
 	info "  The ${g_SCRIPT_PATH}/${g_LAB_PROFILE} was updated successfully."
 }
 
-# (lab_readme) - Place a readme.txt file in each directory with information on where to find the lab.
-#                Passed arguements ($1) the lab number ($2) optional sets increment.
+# (lab_profile) - Create a default lab profile or source the one previously created.
+function lab_profile ()
+{
+	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
+		info "Reading the students lab profile."
+
+		source "${g_SCRIPT_PATH}/${g_LAB_PROFILE}"
+	else
+		cat > "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" <<-EOF
+		# The students class section number.
+		v_SECTION=""
+
+		# The students last name.
+		v_LASTNAME=""
+		EOF
+
+		info "  A lab profile file was created at ${g_SCRIPT_PATH}/${g_LAB_PROFILE}."
+		info "  Manually update the students lab profile by running this script again using ${g_PROGNAME} -I"
+		cleanup_and_exit_with_code 0
+	fi
+}
+
+# (lab_readme) - Place a readme.txt file in each directory with information on where to find the lab. Passed arguements ($1) the lab number ($2) optional sets increment.
 function lab_readme ()
 {
 	# (l_WORKING_DIRECTORY) - Local string used to hold the working directory passed in from $1.
@@ -774,6 +738,246 @@ function lab_readme ()
 	info "  Setting the ownership and permissions for lab readme file: $l_LAB."
 	chown root:labusers1 "$l_WORKING_DIRECTORY/$l_FILENAME"
 	chmod 644 "$l_WORKING_DIRECTORY/$l_FILENAME"
+}
+
+# (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
+function reset_permissions_check ()
+{
+	if [ $EUID -ne 0 ]; then
+		warning "To properly reset this lab you must run the $g_PROGRAM_NAME script using sudo."
+		cleanup_and_exit_with_code 1
+	fi
+}
+
+# (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
+function test_user ()
+{
+	# (l_USER) - Local string value used to hold the username passed in from $1.
+	local l_USER="$1"
+
+	if id -u "$l_USER" >/dev/null 2>&1; then
+		userdel -r -f "$l_USER" >> /dev/null 2>&1
+	fi
+
+	if [ $(getent group $l_USER) ]; then
+		groupdel $l_USER
+	fi
+}
+
+# (test_group) - Function used to test for the existence of a group. Passes arguements ($1) group name.
+function test_group ()
+{
+	# (l_GROUP) - Local string value used to hold the group name passed in from $1.
+	local l_GROUP="$1"
+
+	if [ $(getent group $l_GROUP) ]; then
+		groupdel $l_GROUP
+	fi
+}
+
+# (uninstall) - Function used to uninstall the lab enviornment.
+function uninstall ()
+{
+	# (l_REPLY) - A local variable used to capture a yes/no response.
+	local l_REPLY=""
+
+	info "Uninstalling the lab enviornment."
+
+	read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
+	printf "\n\n"
+
+	if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
+		# Restore /etc/fstab created during base install.
+		info "  Restoring the /etc/fstab file."
+		if [ -f /etc/fstab.bak ]; then
+			mv /etc/fstab{.bak,} &>/dev/null
+		else
+			warning "    The backup copy of the filesystem table no longer exists."
+		fi
+
+		# Remove the lab user(s).
+		info "  Removing users and their home directories."
+		if id -u "labuser1" >/dev/null 2>&1; then
+			if [ $(id -nG labuser1 | grep -qw sudo) ]; then
+				info "    Removing labuser1 from the sudo group."
+				gpasswd --delete labuser1 sudo >> /dev/null 2>&1
+			fi
+		fi
+
+		test_user labuser1
+		test_user labuser2
+		test_user labuser3
+		test_user labuser4
+		test_user labuser5
+		test_user labuser9
+
+		# Remove the lab security group(s).
+		info "  Removing security groups."
+		test_group labusers1
+		test_group labusers2
+		test_group labusers3
+		test_group labusers5
+		test_group finance
+		test_group labusers9
+		sed -i -e '/labuser9 ALL=(root) NOPASSWD: \/bin\/systemctl enable ssh, \/bin\/systemctl disable ssh, \/bin\/systemctl reload ssh, \/bin\/systemctl start ssh, \/bin\/systemctl stop ssh/d' /etc/sudoers
+
+		# Chapter 5 (Disable SSH)
+		info "  Stopping the SSH service."
+		systemctl stop ssh 2>/dev/null
+
+		info "  Disabling the SSH service."
+		systemctl disable ssh 2>/dev/null
+
+		# Chapter 8 (Remove hwsnbn.sh)
+		info "  Cleaning up the /etc/crontab table."
+		sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
+
+		# Chapter 12 (Remove Users)
+		test_user labuser4
+		test_group finance
+		test_user labuser5
+		test_group labusers5
+
+		# Chapter 12 (Remove Quota Disk)
+		if $(mount | grep -qw /dev/sdb1); then
+			info "  Unmounting the quota disk /dev/sdb1"
+			umount --lazy /dev/sdb1
+		fi
+
+		info "  Resetting disk /dev/sdb."
+		wipefs /dev/sdb --all --force --quiet
+		sgdisk --zap /dev/sdb >> /dev/nul
+
+		# Chapter 18 (Remove Disk)
+		if $(mount | grep -qw /dev/sdc1); then
+			info "  Unmounting the disk /dev/sdc1"
+			umount --lazy /dev/sdc1
+		fi
+
+		info "  Resetting disk /dev/sdc."
+		wipefs /dev/sdc --all --force --quiet
+		sgdisk --zap /dev/sdc >> /dev/nul
+
+		# Chapter 19 (Cleanup Volume Group)
+		if $(mount | grep -qw /dev/mapper/vg1-CIT220); then
+			info "  Unmounting the volume group /dev/mapper/vg1-CIT220"
+			umount --lazy /dev/mapper/vg1-CIT220
+		fi
+
+		if [ -b /dev/mapper/vg1-CIT220 ]; then
+			info "  Removing Volume Group."
+
+			vgchange -a n vg1 >> /dev/null 2>&1
+			lvremove --force /dev/vg1/CIT220 >> /dev/null 2>&1
+			vgremove vg1 >> /dev/null 2>&1
+			pvremove /dev/sdd >> /dev/null 2>&1
+			pvremove /dev/sde >> /dev/null 2>&1
+		fi
+
+		info "  Resetting disks /dev/sdd."
+		wipefs /dev/sdd --all --force --quiet
+		sgdisk --zap /dev/sdd >> /dev/nul
+
+		info "  Resetting disks /dev/sde."
+		wipefs /dev/sde --all --force --quiet
+		sgdisk --zap /dev/sde >> /dev/nul
+
+		# Chapter 19 (Cleanup RAID)
+		if [ -b /dev/md0 ]; then
+			if $(mount | grep -qw /dev/md0); then
+				info "  Unmounting the RAID volume /dev/md0"
+				umount --lazy /dev/md0
+			fi
+
+			info "  Stopping RAID volume /dev/md0"
+			mdadm --stop /dev/md0 >> /dev/nul
+		fi
+
+		info "  Resetting disk /dev/sdf."
+		wipefs /dev/sdf --all --force --quiet
+		sgdisk --zap /dev/sdf >> /dev/nul
+
+		info "  Resetting disk /dev/sdg."
+		wipefs /dev/sdg --all --force --quiet
+		sgdisk --zap /dev/sdg >> /dev/nul
+
+		info "  Resetting disk /dev/sdh."
+		wipefs /dev/sdh --all --force --quiet
+		sgdisk --zap /dev/sdh >> /dev/nul
+
+		# Chapter 22 (Reset Firewall)
+		info "  Resetting ipTables."
+		iptables -F
+
+		# Chapter 25 (Reset LOCALE)
+		ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime 
+
+		# Remove lab directory.
+		if [[ -d "$g_LAB_PATH" ]]; then
+			info "  Removing the lab directory."
+			rm -r "$g_LAB_PATH"
+		fi
+
+		# Remove lab symbolic link.
+		if [[ -h "$g_LAB_SYMLINK" ]]; then
+			info "  Removing the lab symbolic link."
+			rm -r "$g_LAB_SYMLINK"
+		fi
+
+		info "Removing installed packages."
+		#CH05
+		uninstall_package net-tools
+
+		#CH06
+		uninstall_package lynx
+	
+		#CH07
+		uninstall_package tree
+
+		#CH09
+		uninstall_package acl
+
+		#CH11
+		uninstall_package zip
+
+		#CH12
+		uninstall_package quota
+
+		#CH16
+		uninstall_package sysstat
+		uninstall_package procinfo
+		unnstall_package ioping
+
+		#CH20
+		uninstall_package network-manager
+		uninstall_package traceroute
+		uninstall_package nmap
+		uninstall_package iftop
+
+		#CH21
+		uninstall_package whois
+
+		#CH23
+		uninstall_package at
+
+		#CH27
+		uninstall_package git
+	fi
+
+	info "The lab enviornment has been uninstalled."
+}
+
+# (uninstall_package) - Install software packages. Passed arguements ($1) package name.
+function uninstall_package ()
+{
+	local l_package="$1"
+
+	# Uninstall packages and report error conditions as warning.
+	info "    Uninstalling the $l_package package(s)."
+	uninstall_package  $l_package -qq &>/dev/null
+	if [ $? -ne 0 ]; then
+		warning "The $l_package package installation failed with an error condition."
+	fi
 }
 # *************************** script specific functions ************************
 
@@ -973,30 +1177,6 @@ function base ()
 	printf "g_INSTALL_DATE=$l_TIMESTAMP\n" >> "$g_LAB_PATH/.lid"
 	chown root:root "$g_LAB_PATH/.lid"
 	chmod 00440 "$g_LAB_PATH/.lid"
-
-	# Create script to move installation script to labs directory
-	if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
-		info "Moving the installation script then continuing the installation."
-		printf '#!/bin/bash\n\n' >> install.sh
-
-		if [ "$g_SCRIPT_PATH" == "/" ]; then
-			printf "mv \"/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "rm \"/install.sh\"\n" >> install.sh
-			printf "exec /bin/bash \"$g_LAB_PATH/$g_PROGNAME\" -i -z\n" >> install.sh
-		else
-			printf "mv \"$g_SCRIPT_PATH/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
-			printf "rm \"$g_SCRIPT_PATH/install.sh\"\n" >> install.sh
-			printf "exec /bin/bash \"$g_LAB_PATH/$g_PROGNAME\" -i -z\n" >> install.sh
-		fi
-
-		chmod 750 "$g_SCRIPT_PATH/install.sh"
-		chown mkisowa:labusers1 "$g_SCRIPT_PATH/install.sh"
-		exec /bin/bash "$g_SCRIPT_PATH/install.sh"
-	fi
 
 	# Create Virtual Machine Maintenance Scripts
 	info "Deploying maintenance scripts."
@@ -1281,6 +1461,30 @@ function base ()
 	info "  Setting the ownership and permissions for maintenance scripts."
 	chown root:root "/root/*.sh"
 	chmod 775 "/root/*.sh"
+
+	# Create script to move installation script to labs directory
+	if ! [ "$g_SCRIPT_PATH" == "$g_LAB_PATH" ]; then
+		info "Moving the installation script then continuing the installation."
+		printf '#!/bin/bash\n\n' >> install.sh
+
+		if [ "$g_SCRIPT_PATH" == "/" ]; then
+			printf "mv \"/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "rm \"/install.sh\"\n" >> install.sh
+			printf "exec /bin/bash \"$g_LAB_PATH/$g_PROGNAME\" -i -z\n" >> install.sh
+		else
+			printf "mv \"$g_SCRIPT_PATH/$g_PROGNAME\" \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "chmod 750 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "chown root:labusers1 \"$g_LAB_PATH/$g_PROGNAME\"\n" >> install.sh
+			printf "rm \"$g_SCRIPT_PATH/install.sh\"\n" >> install.sh
+			printf "exec /bin/bash \"$g_LAB_PATH/$g_PROGNAME\" -i -z\n" >> install.sh
+		fi
+
+		chmod 750 "$g_SCRIPT_PATH/install.sh"
+		chown mkisowa:labusers1 "$g_SCRIPT_PATH/install.sh"
+		exec /bin/bash "$g_SCRIPT_PATH/install.sh"
+	fi
 }
 
 # CHAPTER - Name of Chapter - Passed arguements ($1) the operation are we performing, ($2) the chapter/lab number.
@@ -3836,32 +4040,15 @@ process_command_line_options "${@}"
 internal_consistency_option_checks
 lab_profile
 
-# Only clear screen and present script banner when GAFI is zero.
+# Only clear screen and present script banner when gAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
 	clear
 	script_banner
 fi
 
-# Update Notice
-if ((g_ARG_UPDATE==0)); then
-	update_notice
-fi
-
-# Interactive configuration of the configuration file
-if ((g_ARG_PROFILE==1)); then
-	info "The interactive configuration file option was selected."
-
-	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
-		interactive_lab_profile
-	else
-		error "  The configuration file doesn't exist!"
-	fi
-
-	cleanup_and_exit_with_code 0
-fi
-
-# Process Options
+# CHANGE LAB
 if ((g_ARG_CHANGE_LAB==1)); then
+	# INSTRUCTOR FUNCTION, ARE WE THE INSTRUCTOR?
 	if [ $EUID -ne 500 ]; then
 		warning "This option can only be run by your instructor."
 		cleanup_and_exit_with_code 1
@@ -3870,246 +4057,89 @@ if ((g_ARG_CHANGE_LAB==1)); then
 	fi
 fi
 
+# GRADE LAB
 if ((g_ARG_GRADE_LAB==1)); then
 	info "Grading lab: $g_ARG_GRADE..."
 	chapter_$g_ARG_GRADE -g $g_ARG_GRADE
 fi
 
+# INSTALL LAB ENVIORNMENT
 if ((g_ARG_INSTALL==1)); then
-	if ! ((g_ARG_FINISH_INSTALL==1)); then
-		info "Starting installation of the lab enviornment."
-	else
-		info "Continuing the installation of the lab enviornment."
+	# ROOT FUNCTION, ARE WE ROOT?
+	if [ $EUID -ne 0 ]; then
+		warning "This option can only be run using administrative permissions."
+		cleanup_and_exit_with_code 1
 	fi
 
-	# Is this linux a supported device? If not, error and quit.
+	# IS THIS DISTRIBUTION OF LINUX SUPPORTED?
 	if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
-		error "You are attempting to run this script on a device that is not supported."
+		warning "You are attempting to run this script on a device that is not supported."
+		cleanup_and_exit_with_code 1
 	fi
 
-	# Does the lab install date file exist, if yes source it.
+	# SOURCE LID (LAB INSTALL DATE) IF IT EXISTS.
 	if [[ -f "$g_LAB_PATH/.lid" ]]; then
 		source "$g_LAB_PATH/.lid"
 	fi
 
-	# Are we being run by an instructor, if yes run it.
-	#if [ $EUID -ne 500 ]; then
-	if [ $EUID -ne 0 ]; then
-		warning "This option can only be run by your instructor."
-		cleanup_and_exit_with_code 1
-	fi
-
 	if ! ((g_ARG_FINISH_INSTALL==1)); then
+		info "Starting installation of the lab enviornment."
+
 		if [ -n "$g_INSTALL_DATE" ]; then
 			printf "\nThe install date of this lab was on: $g_INSTALL_DATE\n"
-
-			read -r -n 1 -p "Are you sure you want to reinstall the lab enviornment? [Y/n]: " l_REPLY
-			printf "\n\n"
-
-			if [[ "${l_REPLY}" =~ ^[Yy]$ ]]; then
-				info "Completely removing the lab enviornment."
-
-				# Restore /etc/fstab created during base install.
-				info "  Restoring the /etc/fstab file."
-				if [ -f /etc/fstab.bak ]; then
-					mv /etc/fstab{.bak,} &>/dev/null
-				else
-					warning "    The backup copy of the filesystem table no longer exists."
-				fi
-
-				# Remove the lab user(s).
-				info "  Removing users and their home directories."
-				if id -u "labuser1" >/dev/null 2>&1; then
-					if [ $(id -nG labuser1 | grep -qw sudo) ]; then
-						info "    Removing labuser1 from the sudo group."
-						gpasswd --delete labuser1 sudo >> /dev/null 2>&1
-					fi
-				fi
-
-				test_user labuser1
-				test_user labuser2
-				test_user labuser3
-				test_user labuser9
-
-				# Remove the lab security group(s).
-				info "  Removing security groups."
-				test_group labusers1
-				test_group labusers2
-				test_group labusers3
-				test_group labusers9
-				sed -i -e '/labuser9 ALL=(root) NOPASSWD: \/bin\/systemctl enable ssh, \/bin\/systemctl disable ssh, \/bin\/systemctl reload ssh, \/bin\/systemctl start ssh, \/bin\/systemctl stop ssh/d' /etc/sudoers
-
-				# Chapter 5 (Disable SSH)
-				info "  Stopping the SSH service."
-				systemctl stop ssh 2>/dev/null
-
-				info "  Disabling the SSH service."
-				systemctl disable ssh 2>/dev/null
-
-				# Chapter 8 (Remove hwsnbn.sh)
-				info "  Cleaning up the /etc/crontab table."
-				sed -i -e '/1  \*    \* \* \*   root    \/labs\/CH08\/hwsnbn.sh/d' /etc/crontab
-
-				# Chapter 12 (Remove Users)
-				test_user labuser4
-				test_group finance
-				test_user labuser5
-				test_group labusers5
-
-				# Chapter 12 (Remove Quota Disk)
-				if $(mount | grep -qw /dev/sdb1); then
-					info "  Unmounting the quota disk /dev/sdb1"
-					umount --lazy /dev/sdb1
-				fi
-
-				info "  Resetting disk /dev/sdb."
-				wipefs /dev/sdb --all --force --quiet
-				sgdisk --zap /dev/sdb >> /dev/nul
-
-				# Chapter 18 (Remove Disk)
-				if $(mount | grep -qw /dev/sdc1); then
-					info "  Unmounting the disk /dev/sdc1"
-					umount --lazy /dev/sdc1
-				fi
-
-				info "  Resetting disk /dev/sdc."
-				wipefs /dev/sdc --all --force --quiet
-				sgdisk --zap /dev/sdc >> /dev/nul
-
-				# Chapter 19 (Cleanup Volume Group)
-				if $(mount | grep -qw /dev/mapper/vg1-CIT220); then
-					info "  Unmounting the volume group /dev/mapper/vg1-CIT220"
-					umount --lazy /dev/mapper/vg1-CIT220
-				fi
-
-				if [ -b /dev/mapper/vg1-CIT220 ]; then
-					info "  Removing Volume Group."
-
-					vgchange -a n vg1 >> /dev/null 2>&1
-					lvremove --force /dev/vg1/CIT220 >> /dev/null 2>&1
-					vgremove vg1 >> /dev/null 2>&1
-					pvremove /dev/sdd >> /dev/null 2>&1
-					pvremove /dev/sde >> /dev/null 2>&1
-				fi
-
-				info "  Resetting disks /dev/sdd."
-				wipefs /dev/sdd --all --force --quiet
-				sgdisk --zap /dev/sdd >> /dev/nul
-
-				info "  Resetting disks /dev/sde."
-				wipefs /dev/sde --all --force --quiet
-				sgdisk --zap /dev/sde >> /dev/nul
-
-				# Chapter 19 (Cleanup RAID)
-				if [ -b /dev/md0 ]; then
-					if $(mount | grep -qw /dev/md0); then
-						info "  Unmounting the RAID volume /dev/md0"
-						umount --lazy /dev/md0
-					fi
-
-					info "  Stopping RAID volume /dev/md0"
-					mdadm --stop /dev/md0
-				fi
-
-				info "  Resetting disk /dev/sdf."
-				wipefs /dev/sdf --all --force --quiet
-				sgdisk --zap /dev/sdf >> /dev/nul
-
-				info "  Resetting disk /dev/sdg."
-				wipefs /dev/sdg --all --force --quiet
-				sgdisk --zap /dev/sdg >> /dev/nul
-
-				info "  Resetting disk /dev/sdh."
-				wipefs /dev/sdh --all --force --quiet
-				sgdisk --zap /dev/sdh >> /dev/nul
-
-				# Chapter 22 (Reset Firewall)
-				info "  Resetting ipTables."
-				iptables -F
-
-				# Chapter 25 (Reset LOCALE)
-				ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime 
-
-				# Remove lab directory.
-				if [[ -d "$g_LAB_PATH" ]]; then
-					info "  Removing the lab directory."
-					rm -r "$g_LAB_PATH"
-				fi
-
-				# Remove lab symbolic link.
-				if [[ -h "$g_LAB_SYMLINK" ]]; then
-					info "  Removing the lab symbolic link."
-					rm -r "$g_LAB_SYMLINK"
-				fi
-
-				info "Removing installed packages."
-				#CH06
-				info "  Removing the net-tools package(s)."
-				apt -y remove net-tools -qq &>/dev/null
-				info "  Removing the lynx package(s)."
-				apt -y remove lynx -qq &>/dev/null
-				#CH07
-				info "  Removing the tree package(s)."
-				apt -y remove tree -qq &>/dev/null
-				#CH09
-				info "  Removing the acl package(s)."
-				apt -y remove acl -qq &>/dev/null
-				#CH11
-				info "  Removing the zip package(s)."
-				apt -y remove zip -qq &>/dev/null
-				#CH12
-				info "  Removing the quota package(s)."
-				apt -y remove quota -qq &>/dev/null
-				#CH16
-				info "  Removing the sysstat package(s)."
-				apt -y remove sysstat -qq &>/dev/null
-				info "  Removing the procinfo package(s)."
-				apt -y remove procinfo -qq &>/dev/null
-				#CH20
-				info "  Removing the network-manager package(s)."
-				apt -y remove network-manager -qq &>/dev/null
-				apt -y remove traceroute -qq &>/dev/null
-				apt -y remove nmap -qq &>/dev/null
-				apt -y remove iftop -qq &>/dev/null
-				#CH21
-				info "  Removing the whois package(s)."
-				apt -y remove whois -qq &>/dev/null
-				#CH23
-				info "  Removing the at package(s)."
-				apt -y remove at -qq &>/dev/null
-				#CH27
-				info "  Removing the git package(s)."
-				apt -y remove git -qq &>/dev/null
-			fi
-
-			info "The lab enviornment has been completely removed.\n\n"
+			uninstall
 		fi
-	fi
 
-	# Install Base then install labs.
-	if ! ((g_ARG_FINISH_INSTALL==1)); then
 		base
+	else
+		info "Continuing the installation of the lab enviornment."
+
+		# Loop through the chapters, setting up each lab.
+		for i in {1..29}; do
+			chapter_$i -i $i
+		done
 	fi
 
-	# Loop through the chapters, setting up each lab.
-	for i in {1..29}; do
-		chapter_$i -i $i
-	done
-
-	info "Finishing the installation of the lab enviornment."
+	info "The lab enviornment has been installed."
 	cleanup_and_exit_with_code 0
 fi
 
+# SET STUDENT PROFILE
+if ((g_ARG_PROFILE==1)); then
+	info "The interactive configuration file option was selected."
+
+	if [ -f "${g_SCRIPT_PATH}/${g_LAB_PROFILE}" ]; then
+		interactive_lab_profile
+	else
+		warning "  The configuration file doesn't exist!"
+		cleanup_and_exit_with_code 0
+	fi
+fi
+
+# ROLLBACK LAB
 if ((g_ARG_ROLLBACK_LAB==1)); then
 	chapter_$g_ARG_ROLLBACK -r $g_ARG_ROLLBACK
 fi
 
+# UPDATE SCRIPT
 if ((g_ARG_UPDATE==1)); then
+	# ROOT FUNCTION, ARE WE ROOT?
 	if [ $EUID -ne 0 ]; then
 		warning "This option can only be run using administrative permissions."
 		cleanup_and_exit_with_code 1
 	else
 		update
+	fi
+fi
+
+# UNINSTALL LAB ENVIORNMENT
+if ((g_ARG_UNINSTALL==1)); then
+	# ROOT FUNCTION, ARE WE ROOT?
+	if [ $EUID -ne 0 ]; then
+		warning "This option can only be run using administrative permissions."
+		cleanup_and_exit_with_code 1
+	else
+		uninstall
 	fi
 fi
 
