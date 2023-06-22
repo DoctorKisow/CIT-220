@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.35"
+g_VERSION="0.0.36"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -973,6 +973,47 @@ function uninstall ()
 
 		#CH27
 		uninstall_package git
+
+		# REMOVE MAINTENANCE SCRIPTS
+		if [ -f "/root/machine-id.sh" ]; then
+			info "  Removing the machine-id.sh maintenance script."
+			rm "/root/machine-id.sh"
+		fi
+
+		if [ -f "/root/reset-labuser1.sh" ]; then
+			info "  Removing the reset-labuser1..sh maintenance script."
+			rm "/root/reset-labuser1.sh"
+		fi
+
+		if [ -f "/root/reset-labuser2.sh" ]; then
+			info "  Removing the reset-labuser2.sh maintenance script."
+			rm "/root/reset-labuser2.sh"
+		fi
+
+		if [ -f "/root/reset-labuser3.sh" ]; then
+			info "  Removing the reset-labuser3.sh maintenance script."
+			rm "/root/reset-labuser3.sh"
+		fi
+
+		if [ -f "/root/reset-labuser4.sh" ]; then
+			info "  Removing the reset-labuser4.sh maintenance script."
+			rm "/root/reset-labuser4.sh"
+		fi
+
+		if [ -f "/root/reset-labuser5.sh" ]; then
+			info "  Removing the reset-labuser5.sh maintenance script."
+			rm "/root/reset-labuser5.sh"
+		fi
+
+		if [ -f "/root/reset-nic.sh" ]; then
+			info "  Removing the reset-nic.sh maintenance script."
+			rm "/root/reset-nic.sh"
+		fi
+
+		if [ -f "/root/template-prep.sh" ]; then
+			info "  Removing the template-prep.sh maintenance script."
+			rm "/root/template-prep.sh"
+		fi
 	fi
 
 	info "The lab enviornment has been uninstalled."
@@ -1192,7 +1233,7 @@ function base ()
 	# Create Virtual Machine Maintenance Scripts
 	info "Deploying maintenance scripts."
 
-	# Ignore error when adding users, due to manually setting UID/GID.
+	# Ignore error when adding maintenance scripts, due to unbound variables in glob.
 	set +e
 	set +u
 
