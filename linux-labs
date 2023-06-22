@@ -805,7 +805,7 @@ function uninstall ()
 		if [ -f /etc/fstab.bak ]; then
 			mv /etc/fstab{.bak,} &>/dev/null
 		else
-			warning " The backup copy of the filesystem table no longer exists."
+			warning "    The backup copy of the filesystem table no longer exists."
 		fi
 
 		# Remove the lab user(s).
