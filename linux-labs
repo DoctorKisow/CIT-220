@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.46"
+g_VERSION="0.0.47"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -663,6 +663,42 @@ function create_lab ()
 	echo $l_LAB
 }
 
+# (install) - Function used to install the lab enviornment.
+function install ()
+{
+	info "Installing the lab enviornment."
+
+	# IS THIS DISTRIBUTION OF LINUX SUPPORTED?
+	if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
+		warning "You are attempting to run this script on a device that is not supported."
+		cleanup_and_exit_with_code 1
+	fi
+
+	# SOURCE LID (LAB INSTALL DATE) IF IT EXISTS.
+	if [[ -f "$g_LAB_PATH/.lid" ]]; then
+		source "$g_LAB_PATH/.lid"
+	fi
+
+	if [ -n "$g_INSTALL_DATE" ]; then
+		warning "  The lab enviornment was installed on: $g_INSTALL_DATE."
+		warning "  Use must use ${g_PROGNAME} -u to uninstall it first."
+		cleanup_and_exit_with_code 0
+	fi
+
+	if ! ((g_ARG_FINISH_INSTALL==1)); then
+		base
+	else
+		info "Finishing installation of the lab enviornment."
+
+		# Loop through the chapters, setting up each lab.
+		for i in {1..29}; do
+			chapter_$i -i $i
+		done
+	fi
+
+	info "The lab enviornment has been installed."
+}
+
 # (install_package) - Install software packages. Passed arguements ($1) package name.
 function install_package ()
 {
@@ -1243,8 +1279,8 @@ function base ()
 	info "  Creating the machine-id.sh maintenance script."
 	cat > "/root/machine-id.sh" <<-EOF
 	#!/bin/bash
-	#${g_COPYRIGHT_TEXT}
-	#${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>
+	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	rm -f /etc/machine-id
 	dbus-uuidgen --ensure=/etc/machine-id
@@ -1303,7 +1339,6 @@ EOF
 	info "  Setting the ownership and permissions for the reset-labuser1.sh maintenance script."
 	chown root:root "/root/reset-labuser1.sh"
 	chmod 775 "/root/reset-labuser1.sh"
-
 
 	# (reset-labuser2.sh) - A script to reset the labuser2 user to system defaults.
 	info "  Creating the reset-labuser2.sh maintenance script."
@@ -4139,7 +4174,6 @@ function chapter_29 ()
 process_command_line_options "${@}"
 internal_consistency_option_checks
 
-
 # Only clear screen and present script banner when gAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
 	clear
@@ -4171,39 +4205,9 @@ if ((g_ARG_INSTALL==1)); then
 	if [ $EUID -ne 0 ]; then
 		warning "This option can only be run using administrative permissions."
 		cleanup_and_exit_with_code 1
-	fi
-
-	# IS THIS DISTRIBUTION OF LINUX SUPPORTED?
-	if [ "$(cat /etc/lsb-release | grep -o "Ubuntu 22.04")" != "Ubuntu 22.04" ]; then
-		warning "You are attempting to run this script on a device that is not supported."
-		cleanup_and_exit_with_code 1
-	fi
-
-	# SOURCE LID (LAB INSTALL DATE) IF IT EXISTS.
-	if [[ -f "$g_LAB_PATH/.lid" ]]; then
-		source "$g_LAB_PATH/.lid"
-	fi
-
-	if ! ((g_ARG_FINISH_INSTALL==1)); then
-		info "Starting installation of the lab enviornment."
-
-		if [ -n "$g_INSTALL_DATE" ]; then
-			printf "\nThe install date of this lab was on: $g_INSTALL_DATE\n"
-			uninstall
-		fi
-
-		base
 	else
-		info "Continuing the installation of the lab enviornment."
-
-		# Loop through the chapters, setting up each lab.
-		for i in {1..29}; do
-			chapter_$i -i $i
-		done
+		install
 	fi
-
-	info "The lab enviornment has been installed."
-	cleanup_and_exit_with_code 0
 fi
 
 # SET STUDENT PROFILE
