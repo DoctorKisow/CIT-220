@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.47"
+g_VERSION="0.0.49"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -679,13 +679,13 @@ function install ()
 		source "$g_LAB_PATH/.lid"
 	fi
 
-	if [ -n "$g_INSTALL_DATE" ]; then
-		warning "  The lab enviornment was installed on: $g_INSTALL_DATE."
-		warning "  Use must use ${g_PROGNAME} -u to uninstall it first."
-		cleanup_and_exit_with_code 0
-	fi
-
 	if ! ((g_ARG_FINISH_INSTALL==1)); then
+		if [ -n "$g_INSTALL_DATE" ]; then
+			warning "  The lab enviornment was installed on: $g_INSTALL_DATE."
+			warning "  Use must use ${g_PROGNAME} -U to uninstall it first."
+			cleanup_and_exit_with_code 0
+		fi
+
 		base
 	else
 		info "Finishing installation of the lab enviornment."
@@ -1059,6 +1059,7 @@ function uninstall ()
 	fi
 
 	info "The lab enviornment has been uninstalled."
+	info "To reinstall the lab enviornment, download the most recent version of this script from ${g_SCRIPT_URL}."
 }
 
 # (uninstall_package) - Install software packages. Passed arguements ($1) package name.
@@ -4182,9 +4183,9 @@ fi
 
 # CHANGE LAB
 if ((g_ARG_CHANGE_LAB==1)); then
-	# INSTRUCTOR FUNCTION, ARE WE THE INSTRUCTOR?
-	if [ $EUID -ne 500 ]; then
-		warning "This option can only be run by your instructor."
+	# ROOT FUNCTION, ARE WE ROOT?
+	if [ $EUID -ne 0 ]; then
+		warning "This option can only be run using administrative permissions."
 		cleanup_and_exit_with_code 1
 	else
 		chapter_$g_ARG_CHANGE -c $g_ARG_CHANGE
