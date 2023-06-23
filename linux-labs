@@ -14,14 +14,14 @@
 # Commons, PO Box 1866, Mountain View, CA 94042, USA.
 
 # TODO:
-# LAB01-01 - Student Install
-# LAB10-01 - SFTP in CHROOT JAIL (SEE LAB 29)
-# LAB13-01 - (ssh) pg. 364-365, TCP WRAPPERS
-# LAB17-01 - (lsmod)
-# LAB23-01 - Network Troubleshooting
-# LAB29-01 - Chroot on Apache Server
-# RESET MODULES FOR ALL LABS
-# GRADING MODULES FOR ALL LABS
+# [ ] LAB01-01 - Student Install
+# [ ] LAB10-01 - SFTP in CHROOT JAIL (SEE LAB 29)
+# [ ] LAB13-01 - (ssh) pg. 364-365, TCP WRAPPERS
+# [ ] LAB17-01 - (lsmod)
+# [ ] LAB23-01 - Network Troubleshooting
+# [ ] LAB29-01 - Chroot on Apache Server
+# [X] RESET MODULES FOR ALL LABS
+# [ ] GRADING MODULES FOR ALL LABS
 
 # ##############################################################################
 # Virtual Machine Setup
