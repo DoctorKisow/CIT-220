@@ -11,7 +11,7 @@ Dr. Matthew Kisow <mkisow@ccac.edu>
 - [ ] LAB17-01 - (lsmod)
 - [ ] LAB23-01 - Network Troubleshooting
 - [ ] LAB29-01 - Chroot on Apache Server
-- [ ] RESET MODULES FOR ALL LABS
+- [x] RESET MODULES FOR ALL LABS
 - [ ] GRADING MODULES FOR ALL LABS
 
 ## Installation
