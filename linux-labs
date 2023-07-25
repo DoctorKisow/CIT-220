@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.49"
+g_VERSION="0.0.50"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -889,7 +889,11 @@ function uninstall ()
 
 		# Chapter 12 (MOTD)
 		info "  Cleaning up the /etc/motd file."
-		sed -i -e '/This is a private system used for the Linux System Administration CIT-220 class./d' /etc/motd
+		if [[ -f /etc/motd ]]; then
+			sed -i -e '/This is a private system used for the Linux System Administration CIT-220 class./d' /etc/motd
+		else
+			warning "    The /etc/motd file is missing no longer exists."
+		fi
 
 		# Chapter 12 (Remove Quota Disk)
 		if $(mount | grep -qw /dev/sdb1); then
