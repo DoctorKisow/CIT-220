@@ -1027,7 +1027,7 @@ function uninstall ()
 		fi
 
 		if [ -f "/root/reset-labuser1.sh" ]; then
-			info "  Removing the reset-labuser1..sh maintenance script."
+			info "  Removing the reset-labuser1.sh maintenance script."
 			rm "/root/reset-labuser1.sh"
 		fi
 
