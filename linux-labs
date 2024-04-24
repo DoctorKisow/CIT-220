@@ -830,8 +830,8 @@ function reset_labuser ()
 				useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
 				echo 'labuser3:P@$$w0rd' | chpasswd
 				;;
-		4)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
-		5)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
+		4)	warning "Cannot reset this user, reset lab CH12-01 by typing \"linux-labs -r 12\"." ;;
+		5)	warning "Cannot reset this user, reset lab CH12-02 by typing \"linux-labs -r 12\"." ;;
 	esac
 }
 
