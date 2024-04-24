@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.58"
+g_VERSION="0.0.59"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -788,14 +788,14 @@ function lab_readme ()
 # (test_user) - A function used to test for and remove a user account that is passed to it. Passed arguements ($1) user account name.
 function test_user ()
 {
-  # (l_USER) - Local string value used to hold the username passed in from \$1.
-  local l_USER="\$1"
+  # (l_USER) - Local string value used to hold the username passed in from $1.
+  local l_USER="$1"
 
-  if id -u "\$l_USER" >/dev/null 2>&1; then
-    userdel -r -f "\$l_USER" >> /dev/null 2>&1
+  if id -u "$l_USER" >/dev/null 2>&1; then
+    userdel -r -f "$l_USER" >> /dev/null 2>&1
   fi
 
-  if [ \$(getent group \$l_USER) ]; then
+  if [$(getent group $l_USER) ]; then
     groupdel $l_USER
   fi
 }
@@ -803,11 +803,11 @@ function test_user ()
 # (test_group) - A function used to test for and remove a group that is passed to it. Passed arguements ($1) group account name.
 function test_group ()
 {
-  # (l_GROUP) - Local string value used to hold the group name passed in from \$1.
-  local l_GROUP="\$1"
+  # (l_GROUP) - Local string value used to hold the group name passed in from $1.
+  local l_GROUP="$1"
 
-  if [ \$(getent group \$l_GROUP) ]; then
-    groupdel \$l_GROUP
+  if [ $(getent group $l_GROUP) ]; then
+    groupdel $l_GROUP
   fi
 }
 
