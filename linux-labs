@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.61"
+g_VERSION="0.0.62"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -790,30 +790,27 @@ function lab_readme ()
 # (test_user) - A function used to test for and remove a user account that is passed to it. Passed arguements ($1) user account name.
 function test_user ()
 {
-  # (l_USER) - Local string value used to hold the username passed in from $1.
-  local l_USER="$1"
+	# (l_USER) - Local string value used to hold the username passed in from $1.
+	local l_USER="$1"
 
-  if id -u "$l_USER" >/dev/null 2>&1; then
-  echo "labuser-tu: " $l_USER
-    #userdel -r -f "$l_USER" >> /dev/null 2>&1
-  fi
+	if id -u "$l_USER" >/dev/null 2>&1; then
+		echo "userdel -r -f "$l_USER" >> /dev/null 2>&1"
+	fi
 
-  if [$(getent group $l_USER) ]; then
-  echo "labuser-tu: " $l_USER
-    #groupdel $l_USER
-  fi
+	if [$(getent group $l_USER) ]; then
+		echo "groupdel $l_USER"
+	fi
 }
 
 # (test_group) - A function used to test for and remove a group that is passed to it. Passed arguements ($1) group account name.
 function test_group ()
 {
-  # (l_GROUP) - Local string value used to hold the group name passed in from $1.
-  local l_GROUP="$1"
-  echo "labuser-tg: " $l_GROUP
-  if [ $(getent group $l_GROUP) ]; then
-  echo "labuser-tu: " $l_USER
-    #groupdel $l_GROUP
-  fi
+	# (l_GROUP) - Local string value used to hold the group name passed in from $1.
+	local l_GROUP="$1"
+
+	if [ $(getent group $l_GROUP) ]; then
+		echo "groupdel $l_GROUP"
+	fi
 }
 
 # (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
@@ -828,29 +825,25 @@ function reset_permissions_check ()
 # (reset_labuser) - Function used to reset labuser accounts after an incident. Passes arguements ($1) labuser account number (2-5).
 function reset_labuser ()
 {
-  local l_LABUSER=$1
+	local l_LABUSER=$1
 
-echo "labuser: " $l_LABUSER
-
-	#test_user labuser$l_LABUSER
-	#test_group labusers$l_LABUSER
+	test_user labuser$l_LABUSER
+	test_group labusers$l_LABUSER
 
 	case "${l_LABUSER}" in
-    1) echo "labuser: " $l_LABUSER ;;
-    2) echo "labuser: " $l_LABUSER ;;
-    3) echo "labuser: " $l_LABUSER ;;
-    4) echo "labuser: " $l_LABUSER ;;
-    5) echo "labuser: " $l_LABUSER ;;
-  esac
+		1)	echo "labuser: " $l_LABUSER
+				#groupadd -g 1001 labusers1
 
-
-	#groupadd -g 1001 labusers1
-
-	#useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
-	#usermod -g labusers1 labuser1 &>/dev/null
-	#chown labuser1:labusers1 /home/labuser1
-	#echo 'labuser1:P@$$w0rd' | chpasswd
-
+				#useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
+				#usermod -g labusers1 labuser1 &>/dev/null
+				#chown labuser1:labusers1 /home/labuser1
+				#echo 'labuser1:P@$$w0rd' | chpasswd
+				;;
+		2) echo "labuser: " $l_LABUSER ;;
+		3) echo "labuser: " $l_LABUSER ;;
+		4) echo "labuser: " $l_LABUSER ;;
+		5) echo "labuser: " $l_LABUSER ;;
+	esac
 }
 
 
