@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.67"
+g_VERSION="0.0.68"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -831,7 +831,6 @@ function reset_labuser ()
 				echo 'labuser3:P@$$w0rd' | chpasswd
 				;;
 		4)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
-				;;
 		5)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
 	esac
 }
