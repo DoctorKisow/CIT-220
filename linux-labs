@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.57"
+g_VERSION="0.0.58"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -277,7 +277,7 @@ function print_usage ()
 	-i --install           install the lab enviornment
 	-I                     set the students lab profile
 	-r                     roll back a specific lab [1-29]
-	-R                     labuser account reset [2-5]
+	-R                     labuser account reset [1-5]
 	-u --update            update the ${g_PROGNAME} script
 	-U --uninstall         uninstall the lab enviornment
 	-v                     display the version number of ${g_PROGNAME} and exit
@@ -342,7 +342,7 @@ function process_command_line_options ()
 			-i) g_ARG_INSTALL=1; shift ;;
 			-I) g_ARG_PROFILE=1; shift ;;
 			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
-			-R) g_ARG_LABUSER_RESET=1; g_ARG_LABUSER=${2}; (( g_ARG_LABUSER >= 2 && g_ARG_LABUSER <=5 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-R) g_ARG_LABUSER_RESET=1; g_ARG_LABUSER=${2}; (( g_ARG_LABUSER >= 1 && g_ARG_LABUSER <=5 )) || display_usage_message_and_bail_out; shift 2 ;;
 			-u) g_ARG_UPDATE=1; shift ;;
 			-U) g_ARG_UNINSTALL=1; shift;;
 			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
@@ -458,9 +458,7 @@ function update ()
 		fi
 
 	else
-		if ((g_ARG_UPDATE==0)); then
-			info "You are running the current version of this script.\n\n"
-		fi
+		info "You are running the current version of this script.\n\n"
 	fi
 
 	rm -f "$l_TMP_FILE"
@@ -787,6 +785,32 @@ function lab_readme ()
 	chmod 644 "$l_WORKING_DIRECTORY/$l_FILENAME"
 }
 
+# (test_user) - A function used to test for and remove a user account that is passed to it. Passed arguements ($1) user account name.
+function test_user ()
+{
+  # (l_USER) - Local string value used to hold the username passed in from \$1.
+  local l_USER="\$1"
+
+  if id -u "\$l_USER" >/dev/null 2>&1; then
+    userdel -r -f "\$l_USER" >> /dev/null 2>&1
+  fi
+
+  if [ \$(getent group \$l_USER) ]; then
+    groupdel $l_USER
+  fi
+}
+
+# (test_group) - A function used to test for and remove a group that is passed to it. Passed arguements ($1) group account name.
+function test_group ()
+{
+  # (l_GROUP) - Local string value used to hold the group name passed in from \$1.
+  local l_GROUP="\$1"
+
+  if [ \$(getent group \$l_GROUP) ]; then
+    groupdel \$l_GROUP
+  fi
+}
+
 # (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
 function reset_permissions_check ()
 {
@@ -801,7 +825,24 @@ function reset_labuser ()
 {
   local l_LABUSER=$1
 
-  echo "labuser: " $l_LABUSER
+	test_user labuser$l_LABUSER
+	test_group labusers$l_LABUSER
+
+	case "${l_LABUSER}" in
+    1) echo "labuser: " $l_LABUSER ;;
+    2) echo "labuser: " $l_LABUSER ;;
+    3) echo "labuser: " $l_LABUSER ;;
+    4) echo "labuser: " $l_LABUSER ;;
+    5) echo "labuser: " $l_LABUSER ;;
+  esac
+
+
+	#groupadd -g 1001 labusers1
+
+	#useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
+	#usermod -g labusers1 labuser1 &>/dev/null
+	#chown labuser1:labusers1 /home/labuser1
+	#echo 'labuser1:P@$$w0rd' | chpasswd
 
 }
 
