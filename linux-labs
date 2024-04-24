@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.59"
+g_VERSION="0.0.60"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -360,7 +360,9 @@ function script_banner ()
 	printf "${g_CYAN_TEXT}${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>${g_RESET_ATTS}\n"
 	printf -- "--------------------------------------------------------------------------------\n\n"
 
-	update
+	if ((g_ARG_UPDATE==0)); then
+		update
+	fi
 }
 
 # (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
@@ -790,13 +792,13 @@ function test_user ()
 {
   # (l_USER) - Local string value used to hold the username passed in from $1.
   local l_USER="$1"
-
+echo "labuser-tu: " $l_USER
   if id -u "$l_USER" >/dev/null 2>&1; then
-    userdel -r -f "$l_USER" >> /dev/null 2>&1
+    #userdel -r -f "$l_USER" >> /dev/null 2>&1
   fi
 
   if [$(getent group $l_USER) ]; then
-    groupdel $l_USER
+    #groupdel $l_USER
   fi
 }
 
@@ -805,9 +807,9 @@ function test_group ()
 {
   # (l_GROUP) - Local string value used to hold the group name passed in from $1.
   local l_GROUP="$1"
-
+  echo "labuser-tg: " $l_GROUP
   if [ $(getent group $l_GROUP) ]; then
-    groupdel $l_GROUP
+    #groupdel $l_GROUP
   fi
 }
 
@@ -825,8 +827,10 @@ function reset_labuser ()
 {
   local l_LABUSER=$1
 
-	test_user labuser$l_LABUSER
-	test_group labusers$l_LABUSER
+echo "labuser: " $l_LABUSER
+
+	#test_user labuser$l_LABUSER
+	#test_group labusers$l_LABUSER
 
 	case "${l_LABUSER}" in
     1) echo "labuser: " $l_LABUSER ;;
@@ -4231,9 +4235,7 @@ internal_consistency_option_checks
 # Only clear screen and present script banner when gAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
 	clear
-	if ((g_ARG_UPDATE==0)); then
-		script_banner
-	fi
+	script_banner
 fi
 
 # CHANGE LAB
