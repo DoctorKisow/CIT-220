@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.55"
+g_VERSION="0.0.56"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -335,7 +335,7 @@ function process_command_line_options ()
 			-i) g_ARG_INSTALL=1; shift ;;
 			-I) g_ARG_PROFILE=1; shift ;;
 			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
-			-R) g_ARG_LABUSER_RESET=1; g_ARG_LABUSER=${2}; (( g_ARG_LABUSER >= 2 && g_AGR_LABUSER <=5 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-R) g_ARG_LABUSER_RESET=1; g_ARG_LABUSER=${2}; (( g_ARG_LABUSER >= 2 && g_ARG_LABUSER <=5 )) || display_usage_message_and_bail_out; shift 2 ;;
 			-u) g_ARG_UPDATE=1; shift ;;
 			-U) g_ARG_UNINSTALL=1; shift;;
 			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
@@ -451,7 +451,9 @@ function update ()
 		fi
 
 	else
-		info "You are running the current version of this script.\n\n"
+		if ((g_ARG_UPDATE==1)); then
+			info "You are running the current version of this script.\n\n"
+		fi
 	fi
 
 	rm -f "$l_TMP_FILE"
