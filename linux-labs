@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.66"
+g_VERSION="0.0.67"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -807,46 +807,32 @@ function reset_labuser ()
 		1)	test_user labuser1
 				test_group labusers1
 
-				#groupadd -g 1001 labusers1
+				groupadd -g 1001 labusers1
 
-				#useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
-				#usermod -g labusers1 labuser1 &>/dev/null
-				#chown labuser1:labusers1 /home/labuser1
-				#echo 'labuser1:P@$$w0rd' | chpasswd
+				useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
+				usermod -g labusers1 labuser1 &>/dev/null
+				chown labuser1:labusers1 /home/labuser1
+				echo 'labuser1:P@$$w0rd' | chpasswd
 				;;
 		2)	test_user labuser2
 				test_group labusers2
 
-				#groupadd -g 1002 labusers2
+				groupadd -g 1002 labusers2
 
-				#useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
-				#echo 'labuser2:P@$$w0rd' | chpasswd
+				useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
+				echo 'labuser2:P@$$w0rd' | chpasswd
 				;;
 		3)	test_user labuser3
 				test_group labusers3
 
-				#groupadd -g 1003 labusers3
+				groupadd -g 1003 labusers3
 
-				#useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
-				#echo 'labuser3:P@$$w0rd' | chpasswd
+				useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
+				echo 'labuser3:P@$$w0rd' | chpasswd
 				;;
-		4)	test_user labuser4
-				test_group finance
-
-				#groupadd -g finance
-				#usermod -a -G finance labuser1
-				#usermod -a -G finance labuser2
-				#usermod -a -G finance labuser4
-
-				#useradd --comment "Lab User 4" --create-home --no-user-group --gid 1001 --groups labusers1,sudo --shell /bin/false labuser4
-				#echo 'labuser4:P@$$w0rd' | chpasswd
+		4)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
 				;;
-		5)	test_user labuser5
-				test_group labusers5
-
-				#useradd --comment "Lab User 5" --create-home --user-group --groups labusers1 --shell /bin/bash labuser5
-				#echo 'labuser5:P@$$w0rd' | chpasswd
-				;;
+		5)	warning "Cannot reset this user, reset the chapter CH12-01 by typing \"linux-labs -r 12\"." ;;
 	esac
 }
 
@@ -855,13 +841,13 @@ function test_user ()
 {
 	# (l_USER) - Local string value used to hold the username passed in from $1.
 	local l_USER="$1"
-echo "tu"
+
 	if id -u "$l_USER" >/dev/null 2>&1; then
-		echo userdel -r -f "$l_USER" >> /dev/null 2>&1
+		userdel -r -f "$l_USER" >> /dev/null 2>&1
 	fi
 
 	if [ $(getent group $l_USER) ]; then
-		echo groupdel $l_USER
+		groupdel $l_USER
 	fi
 }
 
@@ -870,9 +856,9 @@ function test_group ()
 {
 	# (l_GROUP) - Local string value used to hold the group name passed in from $1.
 	local l_GROUP="$1"
-echo "tg"
+
 	if [ $(getent group $l_GROUP) ]; then
-		echo groupdel $l_GROUP
+		groupdel $l_GROUP
 	fi
 }
 
@@ -1349,236 +1335,7 @@ function base ()
 	info "  Setting the ownership and permissions for the machine-id.sh maintenance script."
 	chown root:root "/root/machine-id.sh"
 	chmod 775 "/root/machine-id.sh"
-
-	# (reset-labuser1.sh) - A script to reset the labuser1 user to system defaults.
-	info "  Creating the reset-labuser1.sh maintenance script."
-	cat > "/root/reset-labuser1.sh" << 'EOF'
-	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
-	#Dr. Matthew Kisow <mkisow@ccac.edu>
-
-	function test_user ()
-	{
-		# (l_USER) - Local string value used to hold the username passed in from \$1.
-		local l_USER="\$1"
-
-		if id -u "\$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "\$l_USER" >> /dev/null 2>&1
-		fi
-
-		if [ \$(getent group \$l_USER) ]; then
-			groupdel $l_USER
-		fi
-	}
-
-	function test_group ()
-	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from \$1.
-		local l_GROUP="\$1"
-
-		if [ \$(getent group \$l_GROUP) ]; then
-			groupdel \$l_GROUP
-		fi
-	}
-
-	test_user labuser1
-	test_group labusers1
-
-	groupadd -g 1001 labusers1
-
-	useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
-	usermod -g labusers1 labuser1 &>/dev/null
-	chown labuser1:labusers1 /home/labuser1
-	echo 'labuser1:P@$$w0rd' | chpasswd
-EOF
-
-	sed -i -e 's/^\t//g' reset-labuser1.sh
-	info "  Setting the ownership and permissions for the reset-labuser1.sh maintenance script."
-	chown root:root "/root/reset-labuser1.sh"
-	chmod 775 "/root/reset-labuser1.sh"
-
-	# (reset-labuser2.sh) - A script to reset the labuser2 user to system defaults.
-	info "  Creating the reset-labuser2.sh maintenance script."
-	cat > "/root/reset-labuser2.sh" << 'EOF'
-	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
-	#Dr. Matthew Kisow <mkisow@ccac.edu>
-
-	function test_user ()
-	{
-		# (l_USER) - Local string value used to hold the username passed in from $1.
-		local l_USER="$1"
-
-		if id -u "$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "$l_USER" >> /dev/null 2>&1
-		fi
-
-		if [ $(getent group $l_USER) ]; then
-			groupdel $l_USER
-		fi
-	}
-
-	function test_group ()
-	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-		local l_GROUP="$1"
-
-		if [ $(getent group $l_GROUP) ]; then
-			groupdel $l_GROUP
-		fi
-	}
-
-	test_user labuser2
-	test_group labusers2
-
-	groupadd -g 1002 labusers2
-
-	useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
-	chown labuser2:labusers2 /home/labuser2
-	echo 'labuser2:P@$$w0rd' | chpasswd
-EOF
-
-	sed -i -e 's/^\t//g' reset-labuser2.sh
-	info "  Setting the ownership and permissions for the reset-labuser2.sh maintenance script."
-	chown root:root "/root/reset-labuser2.sh"
-	chmod 775 "/root/reset-labuser2.sh"
-
-	# (reset-labuser3.sh) - A script to reset the labuser3 user to system defaults.
-	info "  Creating the reset-labuser3.sh maintenance script."
-	cat > "/root/reset-labuser3.sh" << 'EOF'
-	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
-	#Dr. Matthew Kisow <mkisow@ccac.edu>
-
-	function test_user ()
-	{
-		# (l_USER) - Local string value used to hold the username passed in from $1.
-		local l_USER="$1"
-
-		if id -u "$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "$l_USER" >> /dev/null 2>&1
-		fi
-
-		if [ $(getent group $l_USER) ]; then
-			groupdel $l_USER
-		fi
-	}
-
-	function test_group ()
-	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-		local l_GROUP="$1"
-
-		if [ $(getent group $l_GROUP) ]; then
-			groupdel $l_GROUP
-		fi
-	}
-
-	test_user labuser3
-	test_group labusers3
-
-	groupadd -g 1003 labusers3
-
-	useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
-	chown labuser3:labusers3 /home/labuser3
-	echo 'labuser3:P@$$w0rd' | chpasswd
-EOF
-
-	sed -i -e 's/^\t//g' reset-labuser3.sh
-	info "  Setting the ownership and permissions for the reset-labuser3.sh maintenance script."
-	chown root:root "/root/reset-labuser3.sh"
-	chmod 775 "/root/reset-labuser3.sh"
-
-	# (reset-labuser4.sh) - A script to reset the labuser4 user to system defaults.
-	info "  Creating the reset-labuser4.sh maintenance script."
-	cat > "/root/reset-labuser4.sh" << 'EOF'
-	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
-	#Dr. Matthew Kisow <mkisow@ccac.edu>
-
-	function test_user ()
-	{
-		# (l_USER) - Local string value used to hold the username passed in from $1.
-		local l_USER="$1"
-
-		if id -u "$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "$l_USER" >> /dev/null 2>&1
-		fi
-
-		if [ $(getent group $l_USER) ]; then
-			groupdel $l_USER
-		fi
-	}
-
-	function test_group ()
-	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-		local l_GROUP="$1"
-
-		if [ $(getent group $l_GROUP) ]; then
-			groupdel $l_GROUP
-		fi
-	}
-
-	test_user labuser4
-	test_group finance
-
-	groupadd -g finance
-	usermod -a -G finance labuser1
-	usermod -a -G finance labuser2
-	usermod -a -G finance labuser4
-
-	useradd --comment "Lab User 4" --create-home --no-user-group --gid 1001 --groups labusers1,sudo --shell /bin/false labuser4
-	echo 'labuser4:P@$$w0rd' | chpasswd
-EOF
-
-	sed -i -e 's/^\t//g' reset-labuser4.sh
-	info "  Setting the ownership and permissions for the reset-labuser4.sh maintenance script."
-	chown root:root "/root/reset-labuser4.sh"
-	chmod 775 "/root/reset-labuser4.sh"
-
-	# (reset-labuser5.sh) - A script to reset the labuser5 user to system defaults.
-	info "  Creating the reset-labuser5.sh maintenance script."
-	cat > "/root/reset-labuser5.sh" << 'EOF'
-	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
-	#Dr. Matthew Kisow <mkisow@ccac.edu>
-
-	function test_user ()
-	{
-		# (l_USER) - Local string value used to hold the username passed in from $1.
-		local l_USER="$1"
-
-		if id -u "$l_USER" >/dev/null 2>&1; then
-			userdel -r -f "$l_USER" >> /dev/null 2>&1
-		fi
-
-		if [ $(getent group $l_USER) ]; then
-			groupdel $l_USER
-		fi
-	}
-
-	function test_group ()
-	{
-		# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-		local l_GROUP="$1"
-
-		if [ $(getent group $l_GROUP) ]; then
-			groupdel $l_GROUP
-		fi
-	}
-
-	test_user labuser5
-	test_group labusers5
-
-	useradd --comment "Lab User 5" --create-home --user-group --groups labusers1 --shell /bin/bash labuser5
-	echo 'labuser5:P@$$w0rd' | chpasswd
-EOF
-
-	sed -i -e 's/^\t//g' reset-labuser5.sh
-	info "  Setting the ownership and permissions for the reset-labuser5.sh maintenance script."
-	chown root:root "/root/reset-labuser5.sh"
-	chmod 775 "/root/reset-labuser5.sh"
+	EOF
 
 	# (reset-nic.sh) - A script to reset the network card.
 	info "  Creating the reset-nic.sh maintenance script."
