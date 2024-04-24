@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.64"
+g_VERSION="0.0.65"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -796,16 +796,17 @@ function reset_permissions_check ()
 	fi
 }
 
-# (reset_labuser) - Function used to reset labuser accounts after an incident. Passes arguements ($1) labuser account number (2-5).
+# (reset_labuser) - Function used to reset labuser accounts after an incident. Passes arguements ($1) labuser account number (1-5).
 function reset_labuser ()
 {
 	local l_LABUSER=$1
-echo "WTF1"
-	test_user labuser$l_LABUSER
-	test_group labusers$l_LABUSER
+
+  info "Resetting the labuser$l_LABUSER account and associated groups back to default."
 
 	case "${l_LABUSER}" in
-		1)	echo "labuser: " $l_LABUSER
+		1)	test_user labuser1
+				test_group labusers1
+
 				#groupadd -g 1001 labusers1
 
 				#useradd --comment "Lab User 1" --uid 501 --create-home --no-user-group --gid 1001 --groups adm,cdrom,sudo,dip,plugdev,lxd,labusers2 --shell /bin/bash labuser1
@@ -813,13 +814,41 @@ echo "WTF1"
 				#chown labuser1:labusers1 /home/labuser1
 				#echo 'labuser1:P@$$w0rd' | chpasswd
 				;;
-		2) echo "labuser: " $l_LABUSER ;;
-		3) echo "labuser: " $l_LABUSER ;;
-		4) echo "labuser: " $l_LABUSER ;;
-		5) echo "labuser: " $l_LABUSER ;;
+		2)	test_user labuser2
+				test_group labusers2
+
+				#groupadd -g 1002 labusers2
+
+				#useradd --comment "Lab User 2" --uid 1002 --create-home --no-user-group --gid 1002 --shell /bin/bash labuser2
+				#echo 'labuser2:P@$$w0rd' | chpasswd
+				;;
+		3)	test_user labuser3
+				test_group labusers3
+
+				#groupadd -g 1003 labusers3
+
+				#useradd --comment "Lab User 3" --uid 1003 --create-home --no-user-group --gid 1001 --groups labusers2 --shell /bin/bash labuser3
+				#echo 'labuser3:P@$$w0rd' | chpasswd
+				;;
+		4)	test_user labuser4
+				test_group finance
+
+				#groupadd -g finance
+				#usermod -a -G finance labuser1
+				#usermod -a -G finance labuser2
+				#usermod -a -G finance labuser4
+
+				#useradd --comment "Lab User 4" --create-home --no-user-group --gid 1001 --groups labusers1,sudo --shell /bin/false labuser4
+				#echo 'labuser4:P@$$w0rd' | chpasswd
+				;;
+		5)	test_user labuser4
+				test_group finance
+
+				#useradd --comment "Lab User 5" --create-home --user-group --groups labusers1 --shell /bin/bash labuser5
+				#echo 'labuser5:P@$$w0rd' | chpasswd
+				;;
 	esac
 }
-
 
 # (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
 function test_user ()
