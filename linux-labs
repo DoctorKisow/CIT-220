@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.56"
+g_VERSION="0.0.57"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -188,49 +188,56 @@ function internal_consistency_option_checks ()
 	while true ; do
 		case "$g_FIRST_TOKEN" in
 			-c)
-				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL)); then
+				if ((g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_LABUSER_RESET)); then
 					warning "You cannot change the enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-g)
-				if ((g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
+				if ((g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_LABUSER_RESET || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
 					warning "You cannot grade a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-i)
-				if ((g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+				if ((g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_LABUSER_RESET || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
 					warning "You cannot setup the labs enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-I)
-				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
+				if ((g_ARG_INSTALL || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_LABUSER_RESET || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB)); then
 					warning "You cannot create or set the lab profile with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-r)
-				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB)); then
+				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_LABUSER_RESET || g_ARG_CHANGE_LAB)); then
 					warning "You cannot rollback a lab with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
+			-R)
+				if ((g_ARG_GRADE_LAB || g_ARG_INSTALL || g_ARG_PROFILE || g_ARG_UPDATE || g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB)); then
+					warning "You cannot reset a labuser account with any other options set."
+					cleanup_and_exit_with_code 1
+				fi
+				break
+				;;
 			-u)
-				if ((g_ARG_UNINSTALL || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
+				if ((g_ARG_UNINSTALL || g_ARG_LABUSER_RESET || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
 					warning "You cannot update this script with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
 				break
 				;;
 			-U)
-				if ((g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
+				if ((g_ARG_LABUSER_RESET || g_ARG_UPDATE || g_ARG_CHANGE_LAB || g_ARG_ROLLBACK_LAB || g_ARG_GRADE_LAB  ||  g_ARG_INSTALL || g_ARG_PROFILE)); then
 					warning "You cannot uninstall the lab enviornment with any other options set."
 					cleanup_and_exit_with_code 1
 				fi
@@ -451,7 +458,7 @@ function update ()
 		fi
 
 	else
-		if ((g_ARG_UPDATE==1)); then
+		if ((g_ARG_UPDATE==0)); then
 			info "You are running the current version of this script.\n\n"
 		fi
 	fi
@@ -4183,7 +4190,9 @@ internal_consistency_option_checks
 # Only clear screen and present script banner when gAFI is zero.
 if ! ((g_ARG_FINISH_INSTALL==1)); then
 	clear
-	script_banner
+	if ((g_ARG_UPDATE==0)); then
+		script_banner
+	fi
 fi
 
 # CHANGE LAB
