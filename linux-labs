@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # linux-labs - A script used to download, setup and grade the CIT-220 lab enviornment for my CIT-220 Linux System Administration classes.
-# Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+# Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved.
 # Dr. Matthew Kisow <mkisow@ccac.edu>
 #
 
@@ -67,11 +67,11 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.68"
+g_VERSION="0.0.71"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
-g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
+g_COPYRIGHT_TEXT="Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved."
 g_AUTHOR_TEXT="Dr. Matthew Kisow"
 g_AUTHOR_EMAIL="mkisow@ccac.edu"
 
@@ -1321,7 +1321,7 @@ function base ()
 	info "  Creating the machine-id.sh maintenance script."
 	cat > "/root/machine-id.sh" <<-EOF
 	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved.
 	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	rm -f /etc/machine-id
@@ -1340,7 +1340,7 @@ function base ()
 	info "  Creating the reset-nic.sh maintenance script."
 	cat > "/root/reset-nic.sh" <<-'EOF'
 	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved.
 	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	ip addr flush dev ens160
@@ -1354,7 +1354,7 @@ function base ()
 	info "  Creating the template-prep.sh maintenance script."
 	cat > "/root/template-prep.sh" <<-'EOF'
 	#!/bin/bash
-	#Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+	#Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved.
 	#Dr. Matthew Kisow <mkisow@ccac.edu>
 
 	# Check if script is running as root first
