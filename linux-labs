@@ -800,7 +800,7 @@ function reset_permissions_check ()
 function reset_labuser ()
 {
 	local l_LABUSER=$1
-echo "WTF"
+echo "WTF1"
 	test_user labuser$l_LABUSER
 	test_group labusers$l_LABUSER
 
