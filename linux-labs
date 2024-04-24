@@ -787,32 +787,6 @@ function lab_readme ()
 	chmod 644 "$l_WORKING_DIRECTORY/$l_FILENAME"
 }
 
-# (test_user) - A function used to test for and remove a user account that is passed to it. Passed arguements ($1) user account name.
-function test_user ()
-{
-	# (l_USER) - Local string value used to hold the username passed in from $1.
-	local l_USER="$1"
-echo "TU"
-	if id -u "$l_USER" >/dev/null 2>&1; then
-		echo "xuserdel -r -f "$l_USER" >> /dev/null 2>&1"
-	fi
-
-	if [$(getent group $l_USER) ]; then
-		echo "xgroupdel $l_USER"
-	fi
-}
-
-# (test_group) - A function used to test for and remove a group that is passed to it. Passed arguements ($1) group account name.
-function test_group ()
-{
-	# (l_GROUP) - Local string value used to hold the group name passed in from $1.
-	local l_GROUP="$1"
-echo "TG"
-	if [ $(getent group $l_GROUP) ]; then
-		echo "xgroupdel $l_GROUP"
-	fi
-}
-
 # (reset_permissions_check) - Ensure that we have the proper permissions to reset the lab.
 function reset_permissions_check ()
 {
@@ -854,11 +828,11 @@ function test_user ()
 	local l_USER="$1"
 
 	if id -u "$l_USER" >/dev/null 2>&1; then
-		userdel -r -f "$l_USER" >> /dev/null 2>&1
+		echo userdel -r -f "$l_USER" >> /dev/null 2>&1
 	fi
 
 	if [ $(getent group $l_USER) ]; then
-		groupdel $l_USER
+		echo groupdel $l_USER
 	fi
 }
 
@@ -869,7 +843,7 @@ function test_group ()
 	local l_GROUP="$1"
 
 	if [ $(getent group $l_GROUP) ]; then
-		groupdel $l_GROUP
+		echo groupdel $l_GROUP
 	fi
 }
 
