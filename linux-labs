@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.60"
+g_VERSION="0.0.61"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -792,12 +792,14 @@ function test_user ()
 {
   # (l_USER) - Local string value used to hold the username passed in from $1.
   local l_USER="$1"
-echo "labuser-tu: " $l_USER
+
   if id -u "$l_USER" >/dev/null 2>&1; then
+  echo "labuser-tu: " $l_USER
     #userdel -r -f "$l_USER" >> /dev/null 2>&1
   fi
 
   if [$(getent group $l_USER) ]; then
+  echo "labuser-tu: " $l_USER
     #groupdel $l_USER
   fi
 }
@@ -809,6 +811,7 @@ function test_group ()
   local l_GROUP="$1"
   echo "labuser-tg: " $l_GROUP
   if [ $(getent group $l_GROUP) ]; then
+  echo "labuser-tu: " $l_USER
     #groupdel $l_GROUP
   fi
 }
