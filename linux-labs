@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.54"
+g_VERSION="0.0.55"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -119,6 +119,8 @@ declare -i g_ARG_ROLLBACK_LAB=0
 declare -i g_ARG_UPDATE=0
 declare -i g_ARG_UNINSTALL=0
 
+declare -i g_ARG_LABUSER_RESET=0
+declare -i g_ARG_LABUSER=0
 declare -i g_ARG_CHANGE=0
 declare -i g_ARG_GRADE=0
 declare -i g_ARG_ROLLBACK=0
@@ -268,6 +270,7 @@ function print_usage ()
 	-i --install           install the lab enviornment
 	-I                     set the students lab profile
 	-r                     roll back a specific lab [1-29]
+	-R                     labuser account reset [2-5]
 	-u --update            update the ${g_PROGNAME} script
 	-U --uninstall         uninstall the lab enviornment
 	-v                     display the version number of ${g_PROGNAME} and exit
@@ -294,7 +297,7 @@ function process_command_line_options ()
 
 	# Error trapping is turned off because we want to handle errors.
 	set +e
-		l_TEMP="$(getopt -o c:g:hiIr:uUvz --long install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
+		l_TEMP="$(getopt -o c:g:hiIr:R:uUvz --long install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
 		l_RC="${?}"
 	set -e
 
@@ -332,6 +335,7 @@ function process_command_line_options ()
 			-i) g_ARG_INSTALL=1; shift ;;
 			-I) g_ARG_PROFILE=1; shift ;;
 			-r) g_ARG_ROLLBACK_LAB=1; g_ARG_ROLLBACK=${2}; (( g_ARG_ROLLBACK >= 1 && g_ARG_ROLLBACK <= 29 )) || display_usage_message_and_bail_out; shift 2 ;;
+			-R) g_ARG_LABUSER_RESET=1; g_ARG_LABUSER=${2}; (( g_ARG_LABUSER >= 2 && g_AGR_LABUSER <=5 )) || display_usage_message_and_bail_out; shift 2 ;;
 			-u) g_ARG_UPDATE=1; shift ;;
 			-U) g_ARG_UNINSTALL=1; shift;;
 			-v) print_version >&2; cleanup_and_exit_with_code 1 ;;
@@ -782,6 +786,16 @@ function reset_permissions_check ()
 		cleanup_and_exit_with_code 1
 	fi
 }
+
+# (reset_labuser) - Function used to reset labuser accounts after an incident. Passes arguements ($1) labuser account number (2-5).
+function reset_labuser ()
+{
+  local l_LABUSER=$1
+
+  echo "labuser: " $l_LABUSER
+
+}
+
 
 # (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
 function test_user ()
@@ -4189,7 +4203,7 @@ if ((g_ARG_GRADE_LAB==1)); then
 	chapter_$g_ARG_GRADE -g $g_ARG_GRADE
 fi
 
-# INSTALL LAB ENVIORNMENT
+# INSTALL LAB ENVIRONMENT
 if ((g_ARG_INSTALL==1)); then
 	# ROOT FUNCTION, ARE WE ROOT?
 	if [ $EUID -ne 0 ]; then
@@ -4197,6 +4211,17 @@ if ((g_ARG_INSTALL==1)); then
 		cleanup_and_exit_with_code 1
 	else
 		install
+	fi
+fi
+
+# RESET LAB USER ACCOUNT
+if ((g_ARG_LABUSER_RESET==1)); then
+	# ROOT FUNCTION, ARE WE ROOT?
+	if [ $EUID -ne 0 ]; then
+		warning "This option can only be run using administrative permissions."
+		cleanup_and_exit_with_code 1
+	else
+		reset_labuser $g_ARG_LABUSER
 	fi
 fi
 
