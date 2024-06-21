@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.77"
+g_VERSION="0.0.78"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -373,7 +373,9 @@ function script_banner ()
   printf -- "--------------------------------------------------------------------------------\n\n"
 
   if ((g_ARG_UPDATE==0)); then
-    update
+    if ! [[ -f "$g_LAB_PATH/.brkfix" ]]; then
+      update
+    fi
   fi
 }
 
@@ -869,7 +871,7 @@ function test_group ()
   local l_GROUP="$1"
 
   if [ $(getent group $l_GROUP) ]; then
-    groupdel $l_GROUP
+    groupdel -f $l_GROUP
   fi
 }
 
@@ -3538,7 +3540,8 @@ function chapter_21 ()
             case $(shuf -i 1-4 -n 1) in
               1)
                 # BREAK ROUTE (NEEDS WORK)
-                info "    Breaking network feature 22.1. When reaching out for help from your instructor use this number."
+                info "    Breaking network feature 22.1."
+                info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=22.1\n" >> "$g_LAB_PATH/.brkfix"
 
             #     route del default gw 10.250.5.1 ens160
@@ -3546,7 +3549,8 @@ function chapter_21 ()
                 ;;
               2)
                 # BREAK NETPLAN PRIVATE ADDRESS (WORKS)
-                info "    Breaking network feature 66.3. When reaching out for help from your instructor use this number."
+                info "    Breaking network feature 66.3."
+                info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=66.3\n" >> "$g_LAB_PATH/.brkfix"
 
                 mv /etc/netplan/00-installer-config.yaml{,.brkfix}
@@ -3571,7 +3575,8 @@ function chapter_21 ()
                 ;;
               3)
                 # BREAK NETPLAN INTERFACE NAME (WORKS)
-                info "    Breaking network feature 106.5. When reaching out for help from your instructor use this number."
+                info "    Breaking network feature 106.5."
+                info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=106.5\n" >> "$g_LAB_PATH/.brkfix"
 
                 mv /etc/netplan/00-installer-config.yaml{,.brkfix}
@@ -3595,7 +3600,8 @@ function chapter_21 ()
                 ;;
               4)
                 # BREAK DNS (WORKS)
-                info "    Breaking network feature 77.4. When reaching out for help from your instructor use this number."
+                info "    Breaking network feature 77.4."
+                info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=77.4\n" >> "$g_LAB_PATH/.brkfix"
 
                 sed -i 's/nameserver 127.0.0.53/nameserver 10.0.5.53/' /etc/resolv.conf
