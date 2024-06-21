@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.78"
+g_VERSION="0.0.79"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -1077,31 +1077,6 @@ function uninstall ()
       rm "/root/machine-id.sh"
     fi
 
-    if [ -f "/root/reset-labuser1.sh" ]; then
-      info "  Removing the reset-labuser1.sh maintenance script."
-      rm "/root/reset-labuser1.sh"
-    fi
-
-    if [ -f "/root/reset-labuser2.sh" ]; then
-      info "  Removing the reset-labuser2.sh maintenance script."
-      rm "/root/reset-labuser2.sh"
-    fi
-
-    if [ -f "/root/reset-labuser3.sh" ]; then
-      info "  Removing the reset-labuser3.sh maintenance script."
-      rm "/root/reset-labuser3.sh"
-    fi
-
-    if [ -f "/root/reset-labuser4.sh" ]; then
-      info "  Removing the reset-labuser4.sh maintenance script."
-      rm "/root/reset-labuser4.sh"
-    fi
-
-    if [ -f "/root/reset-labuser5.sh" ]; then
-      info "  Removing the reset-labuser5.sh maintenance script."
-      rm "/root/reset-labuser5.sh"
-    fi
-
     if [ -f "/root/reset-nic.sh" ]; then
       info "  Removing the reset-nic.sh maintenance script."
       rm "/root/reset-nic.sh"
@@ -1415,6 +1390,7 @@ function base ()
 	echo "      dhcp4: yes"           >> /etc/netplan/00-installer-config.yaml
 	echo "      dhcp-identifier: mac" >> /etc/netplan/00-installer-config.yaml
 
+	chmod 600 /etc/netplan/00-installer-config.yaml
 	#Cleanup and Shutdown
 	truncate -s0 ~/.bash_history
 	truncate -s0 /home/mkisowa/.bash_history
@@ -3553,7 +3529,7 @@ function chapter_21 ()
                 info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=66.3\n" >> "$g_LAB_PATH/.brkfix"
 
-                mv /etc/netplan/00-installer-config.yaml{,.brkfix}
+                mv /etc/netplan/00-installer-config{.yaml,.brkfix}
 
                 printf "network:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
@@ -3570,6 +3546,8 @@ function chapter_21 ()
                 printf "      - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
 
+                chmod 600 /etc/netplan/00-installer-config.yaml
+
             #     dhclient -r
             #     netplan apply
                 ;;
@@ -3579,7 +3557,7 @@ function chapter_21 ()
                 info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=106.5\n" >> "$g_LAB_PATH/.brkfix"
 
-                mv /etc/netplan/00-installer-config.yaml{,.brkfix}
+                mv /etc/netplan/00-installer-config{.yaml,.brkfix}
 
                 printf "network:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
@@ -3595,6 +3573,7 @@ function chapter_21 ()
                 printf "        - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
 
+                chmod 600 /etc/netplan/00-installer-config.yaml
             #     dhclient -r
             #     netplan apply
                 ;;
@@ -3617,13 +3596,15 @@ function chapter_21 ()
             fi
 
             ## IF EXIST
-            if [[ -f "/etc/netplan/00-installer-config.yaml.brkfix" ]]; then
+            if [[ -f "/etc/netplan/00-installer-config.brkfix" ]]; then
               rm /etc/netplan/00-installer-config.yaml
-              mv /etc/netplan/00-installer-config.brkfix{.yaml,}
+              mv /etc/netplan/00-installer-config{.brkfix,.yaml}
             fi
 
             sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
+
             dhclient -r && dhclient
+            info "  The networking in the lab environment has been repaired. Your IP address is: $(hostname -I | awk '{print $1}')."
           fi
         fi
       ;;
