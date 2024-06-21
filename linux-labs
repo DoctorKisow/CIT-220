@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.79"
+g_VERSION="0.0.80"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3601,10 +3601,12 @@ function chapter_21 ()
               mv /etc/netplan/00-installer-config{.brkfix,.yaml}
             fi
 
+echo 1
             sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
-
+echo 2
             dhclient -r && dhclient
-            info "  The networking in the lab environment has been repaired. Your IP address is: $(hostname -I | awk '{print $1}')."
+            info "  The networking in the lab environment has been repaired."
+            info "  Your IP address is: $(hostname -I | awk '{print $1}')."
           fi
         fi
       ;;
