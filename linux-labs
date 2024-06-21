@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.74"
+g_VERSION="0.0.75"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3494,7 +3494,8 @@ function chapter_20 ()
   esac
 }
 
-#CH21 - Network Troubleshooting (No Labs)
+#CH21 - Network Troubleshooting
+#       Lab Validated: 21-JUN-2024
 function chapter_21 ()
 {
   local l_OPER="$1"
@@ -3514,8 +3515,8 @@ function chapter_21 ()
       -c)
         info "Changing lab environment for lab: $l_LAB."
 
-        if [ $g_ARG_BREAK_LAB=1 || $g_ARG_FIX_LAB=1 ]; then
-          if [ $g_ARG_BREAK_LAB=1 ]; then
+        if (($g_ARG_BREAK_LAB==1 || $g_ARG_FIX_LAB==1)); then
+          if (($g_ARG_BREAK_LAB==1)); then
             info "breaking"
             # case $(shuf -i 1-4 -n 1) in
             #   1)
@@ -3577,7 +3578,7 @@ function chapter_21 ()
             # esac
           fi
 
-          if [ $g_ARG_FIX_LAB=1 ]; then
+          if (($g_ARG_FIX_LAB==1)); then
             info "fixing"
           fi
         fi
