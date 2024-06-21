@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.73"
+g_VERSION="0.0.74"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -312,7 +312,7 @@ function process_command_line_options ()
 
   # Error trapping is turned off because we want to handle errors.
   set +e
-    l_TEMP="$(getopt -o c:g:hiIr:R:uUvz --long install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
+    l_TEMP="$(getopt -o bc:fg:hiIr:R:uUvz --long break,fix,install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
     l_RC="${?}"
   set -e
 
@@ -3510,12 +3510,77 @@ function chapter_21 ()
   # Set the lab number variable.
   l_LAB=$(create_lab $l_CH_NUM)
 
-  case "$l_OPER" in
-    -c)
-      info "There is no lab to roll forward for lab: $l_LAB."
-      echo $g_ARG_BREAK_LAB
-      echo $g_ARG_FIX_LAB
-      cleanup_and_exit_with_code 1
+      case "$l_OPER" in
+      -c)
+        info "Changing lab environment for lab: $l_LAB."
+
+        if [ $g_ARG_BREAK_LAB=1 || $g_ARG_FIX_LAB=1 ]; then
+          if [ $g_ARG_BREAK_LAB=1 ]; then
+            info "breaking"
+            # case $(shuf -i 1-4 -n 1) in
+            #   1)
+            #     # BREAK ROUTE (NEEDS WORK)
+            #     echo "Breaking network feature 22.1. When reaching out for help from your instructor use this number."
+            #     route del default gw 10.250.5.1 ens160
+            #     route add default gw 127.0.0.1 lo
+            #     ;;
+            #   2)
+            #     # BREAK NETPLAN PRIVATE ADDRESS (WORKS)
+            #     echo "Breaking network feature 66.3. When reaching out for help from your instructor use this number."
+            #     mv /etc/netplan/00-installer-config.yaml{,.brkfix}
+
+            #     printf "network:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    ens160:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    addresses:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    - 10.0.2.3/24\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    routes:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    - to: default\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      via: 10.0.2.1\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    nameservers:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      addresses:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      - 10.0.2.6\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      search:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
+
+                
+            #     netplan apply
+            #     ;;
+            #   3)
+            #     # BREAK NETPLAN INTERFACE NAME (WORKS)
+            #     echo "Breaking network feature 106.5. When reaching out for help from your instructor use this number."
+            #     mv /etc/netplan/00-installer-config.yaml{,.brkfix}
+
+            #     printf "network:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "    eth0:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      dhcp4: yes\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      dhcp4-overrides:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "        use-dns: no\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      dhcp-identifier: mac\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "      nameservers:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "        addresses:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "        - 127.0.0.53\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "        search:\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "        - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
+            #     printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
+
+            #     dhclient -r
+            #     netplan apply
+            #     ;;
+            #   4)
+            #     # BREAK DNS (WORKS)
+            #     echo "Breaking network feature 77.4. When reaching out for help from your instructor use this number."
+            #     sed -i 's/nameserver 127.0.0.53/nameserver 10.0.5.53/' /etc/resolv.conf
+            #     ;;
+            # esac
+          fi
+
+          if [ $g_ARG_FIX_LAB=1 ]; then
+            info "fixing"
+          fi
+        fi
       ;;
     -g)
       info "There is no grading module available for lab: $l_LAB."
@@ -3525,23 +3590,23 @@ function chapter_21 ()
       info "Setting up the labs for chapter: $l_CH_NUM."
 
       info "  There are no labs available for this chapter."
-      #info "  Setting up the labs for chapter: $l_CH_NUM."
+      info "  Setting up the labs for chapter: $l_CH_NUM."
 
       # SET SECURITY
-      #info "  Creating the chapter: $l_CH_NUM directory."
-      #l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
+      info "  Creating the chapter: $l_CH_NUM directory."
+      l_WORKING_DIRECTORY=$(create_directory $l_CH_NUM)
 
-      #info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
-      #chown root:labusers1 "$l_WORKING_DIRECTORY"
-      #chmod 02754 "$l_WORKING_DIRECTORY"
+      info "  Setting ownership and permissions for the chapter: $l_CH_NUM directory."
+      chown root:labusers1 "$l_WORKING_DIRECTORY"
+      chmod 02754 "$l_WORKING_DIRECTORY"
 
       # CREATE LAB - SET PERMISSIONS
-      #info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
+      info "  Setting up lab number: $l_LAB, for chapter: $l_CH_NUM."
 
       # ...
 
       # WRITE CHAPTER/LAB README
-      #lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
+      lab_readme "$l_WORKING_DIRECTORY" "$l_LAB"
       ;;
     -r)
       info "Resetting Lab: $l_CH_NUM."
