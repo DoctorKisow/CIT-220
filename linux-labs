@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.76"
+g_VERSION="0.0.77"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3522,12 +3522,12 @@ function chapter_21 ()
             # SOURCE BRKFIX (BREAK/FIX) IF IT EXISTS.
             if [[ -f "$g_LAB_PATH/.brkfix" ]]; then
               source "$g_LAB_PATH/.brkfix"
-            fi
 
-            if [ -n "$g_CH21_BRKFIX" ]; then
-              warning "    The lab CH21-01 break function was previously run in this environment."
-              warning "    If you require assistance, please e-mail your instructor with this network feature code: $g_CH21_BRKFIX."
-              cleanup_and_exit_with_code 0
+              if [ -n "$g_CH21_BRKFIX" ]; then
+                warning "    The lab CH21-01 break function was previously run in this environment."
+                warning "    If you require assistance, please e-mail your instructor with this network feature code: $g_CH21_BRKFIX."
+                cleanup_and_exit_with_code 0
+              fi
             fi
 
             if ! [ "$TERM" == "linux" ]; then
