@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.80"
+g_VERSION="0.0.81"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3502,8 +3502,8 @@ function chapter_21 ()
               source "$g_LAB_PATH/.brkfix"
 
               if [ -n "$g_CH21_BRKFIX" ]; then
-                warning "    The lab CH21-01 break function was previously run in this environment."
-                warning "    If you require assistance, please e-mail your instructor with this network feature code: $g_CH21_BRKFIX."
+                warning "    The network troubleshooting feature was previously run."
+                warning "    For assistance, e-mail your instructor with the feature code: $g_CH21_BRKFIX."
                 cleanup_and_exit_with_code 0
               fi
             fi
@@ -3548,7 +3548,7 @@ function chapter_21 ()
 
                 chmod 600 /etc/netplan/00-installer-config.yaml
 
-            #     dhclient -r
+            #     dhclient -r &>/dev/null
             #     netplan apply
                 ;;
               3)
@@ -3574,7 +3574,7 @@ function chapter_21 ()
                 printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
 
                 chmod 600 /etc/netplan/00-installer-config.yaml
-            #     dhclient -r
+            #     dhclient -r &>/dev/null
             #     netplan apply
                 ;;
               4)
@@ -3601,10 +3601,10 @@ function chapter_21 ()
               mv /etc/netplan/00-installer-config{.brkfix,.yaml}
             fi
 
-echo 1
             sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
-echo 2
-            dhclient -r && dhclient
+            dhclient -r &>/dev/null
+            dhclient
+
             info "  The networking in the lab environment has been repaired."
             info "  Your IP address is: $(hostname -I | awk '{print $1}')."
           fi
