@@ -3473,7 +3473,7 @@ function chapter_20 ()
 }
 
 #CH21 - Network Troubleshooting
-#       Lab Validated: 21-JUN-2024
+#       Lab Validated: 23-JUN-2024
 function chapter_21 ()
 {
   local l_OPER="$1"
