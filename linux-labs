@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.82"
+g_VERSION="0.0.83"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3585,19 +3585,25 @@ function chapter_21 ()
             info "  Fixing networking in lab enviornment."
 
             if [[ -f "$g_LAB_PATH/.brkfix" ]]; then
+              info "    Removing break/fix information file."
               rm "$g_LAB_PATH/.brkfix"
             fi
 
             ## IF EXIST
             if [[ -f "/etc/netplan/00-installer-config.brkfix" ]]; then
+              info "    Reverting interface configurations."
               rm /etc/netplan/00-installer-config.yaml
               mv /etc/netplan/00-installer-config{.brkfix,.yaml}
             fi
 
+            info "    Repairing default routes."
             route del default
             route add default gw 10.250.5.1 ens160
 
+            info "    Repairing modifications to nameservers."
             sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
+
+            info "    Releasing and renewing IP address from DHCP server."
             dhclient -r &>/dev/null
             dhclient
 
