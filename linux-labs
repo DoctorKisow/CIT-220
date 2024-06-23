@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.85"
+g_VERSION="0.0.86"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3549,7 +3549,7 @@ function chapter_21 ()
                 chmod 600 /etc/netplan/00-installer-config.yaml
 
                 dhclient -r &>/dev/null
-                netplan apply
+                netplan apply  &>/dev/null
                 ;;
               3)
                 # BREAK NETPLAN INTERFACE NAME (WORKS)
@@ -3568,7 +3568,7 @@ function chapter_21 ()
 
                 chmod 600 /etc/netplan/00-installer-config.yaml
                 dhclient -r &>/dev/null
-                netplan apply
+                netplan apply  &>/dev/null
                 ;;
               4)
                 # BREAK DNS (WORKS)
@@ -3604,7 +3604,7 @@ function chapter_21 ()
                   rm /etc/netplan/00-installer-config.yaml
                   mv /etc/netplan/00-installer-config{.brkfix,.yaml}
 
-                  netplan apply
+                  netplan apply &>/dev/null
 
                   info "    Removing break/fix information file."
                   rm "$g_LAB_PATH/.brkfix"
@@ -3616,7 +3616,7 @@ function chapter_21 ()
                   rm /etc/netplan/00-installer-config.yaml
                   mv /etc/netplan/00-installer-config{.brkfix,.yaml}
 
-                  netplan apply
+                  netplan apply &>/dev/null
 
                   info "    Removing break/fix information file."
                   rm "$g_LAB_PATH/.brkfix"
@@ -3635,13 +3635,13 @@ function chapter_21 ()
                 info "    Releasing and renewing IP address from DHCP server."
                 dhclient -r &>/dev/null
                 dhclient
-              fi
+            else
+              warning "  The break/fix file is missing."
+              cleanup_and_exit_with_code 1
+            fi
 
             info "  The networking in the lab environment has been repaired."
             info "  Your IP address is: $(hostname -I | awk '{print $1}')."
-          else
-            warning "  The break/fix file is missing."
-            cleanup_and_exit_with_code 1
           fi
         fi
       ;;
