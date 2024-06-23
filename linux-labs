@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.81"
+g_VERSION="0.0.82"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3520,8 +3520,8 @@ function chapter_21 ()
                 info "    When reaching out for help from your instructor use this number."
                 printf "g_CH21_BRKFIX=22.1\n" >> "$g_LAB_PATH/.brkfix"
 
-            #     route del default gw 10.250.5.1 ens160
-            #     route add default gw 127.0.0.1 lo
+                route del default
+                route add default gw 127.0.0.1 lo
                 ;;
               2)
                 # BREAK NETPLAN PRIVATE ADDRESS (WORKS)
@@ -3534,22 +3534,22 @@ function chapter_21 ()
                 printf "network:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "    ens160:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "    addresses:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "    - 10.0.2.3/24\n" >> /etc/netplan/00-installer-config.yaml
-                printf "    routes:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "    - to: default\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      via: 10.0.2.1\n" >> /etc/netplan/00-installer-config.yaml
-                printf "    nameservers:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "      addresses:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      - 10.0.2.6\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      search:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
+                printf "      - 10.0.2.3/24\n" >> /etc/netplan/00-installer-config.yaml
+                printf "      routes:\n" >> /etc/netplan/00-installer-config.yaml
+                printf "      - to: default\n" >> /etc/netplan/00-installer-config.yaml
+                printf "        via: 10.0.2.1\n" >> /etc/netplan/00-installer-config.yaml
+                printf "      nameservers:\n" >> /etc/netplan/00-installer-config.yaml
+                printf "        addresses:\n" >> /etc/netplan/00-installer-config.yaml
+                printf "        - 10.0.2.6\n" >> /etc/netplan/00-installer-config.yaml
+                printf "        search:\n" >> /etc/netplan/00-installer-config.yaml
+                printf "        - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
 
                 chmod 600 /etc/netplan/00-installer-config.yaml
 
-            #     dhclient -r &>/dev/null
-            #     netplan apply
+                dhclient -r &>/dev/null
+                netplan apply
                 ;;
               3)
                 # BREAK NETPLAN INTERFACE NAME (WORKS)
@@ -3563,19 +3563,12 @@ function chapter_21 ()
                 printf "  ethernets:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "    eth0:\n" >> /etc/netplan/00-installer-config.yaml
                 printf "      dhcp4: yes\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      dhcp4-overrides:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "        use-dns: no\n" >> /etc/netplan/00-installer-config.yaml
                 printf "      dhcp-identifier: mac\n" >> /etc/netplan/00-installer-config.yaml
-                printf "      nameservers:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "        addresses:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "        - 127.0.0.53\n" >> /etc/netplan/00-installer-config.yaml
-                printf "        search:\n" >> /etc/netplan/00-installer-config.yaml
-                printf "        - ccac.org\n" >> /etc/netplan/00-installer-config.yaml
                 printf "  version: 2\n" >> /etc/netplan/00-installer-config.yaml
 
                 chmod 600 /etc/netplan/00-installer-config.yaml
-            #     dhclient -r &>/dev/null
-            #     netplan apply
+                dhclient -r &>/dev/null
+                netplan apply
                 ;;
               4)
                 # BREAK DNS (WORKS)
@@ -3600,6 +3593,9 @@ function chapter_21 ()
               rm /etc/netplan/00-installer-config.yaml
               mv /etc/netplan/00-installer-config{.brkfix,.yaml}
             fi
+
+            route del default
+            route add default gw 10.250.5.1 ens160
 
             sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
             dhclient -r &>/dev/null
