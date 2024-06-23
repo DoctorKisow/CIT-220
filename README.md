@@ -1,7 +1,7 @@
 # CIT-220
 
 **linux-lab.sh** - A script used to download, setup and grade the CIT-220 lab enviornment for my _CIT-220 Linux System Administration_ classes.<br />
-Copyright &copy; (2022-2023) Dr. Matthew Kisow. All rights reserved.</br>
+Copyright &copy; (2022-2024) Dr. Matthew Kisow. All rights reserved.</br>
 Dr. Matthew Kisow <mkisow@ccac.edu>
 
 ## Tasks
@@ -9,7 +9,7 @@ Dr. Matthew Kisow <mkisow@ccac.edu>
 - [ ] LAB10-01 - SFTP in CHROOT JAIL (SEE LAB 29)
 - [ ] LAB13-01 - (ssh) pr. 364-365, TCP WRAPPERS
 - [ ] LAB17-01 - (lsmod)
-- [ ] LAB23-01 - Network Troubleshooting
+- [x] LAB21-01 - Network Troubleshooting
 - [ ] LAB29-01 - Chroot on Apache Server
 - [x] RESET MODULES FOR ALL LABS
 - [ ] GRADING MODULES FOR ALL LABS
