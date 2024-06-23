@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.84"
+g_VERSION="0.0.85"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -3582,43 +3582,66 @@ function chapter_21 ()
           fi
 
           if (($g_ARG_FIX_LAB==1)); then
-            info "  Fixing networking in lab enviornment."
-
             if [[ -f "$g_LAB_PATH/.brkfix" ]]; then
-              info "    Removing break/fix information file."
-              rm "$g_LAB_PATH/.brkfix"
-            fi
+              source "$g_LAB_PATH/.brkfix"
 
-            ## IF EXIST BACKUP NETPLAN FILE, REVERT AND APPLY
-            if [[ -f "/etc/netplan/00-installer-config.brkfix" ]]; then
-              info "    Reverting interface configurations."
-              rm /etc/netplan/00-installer-config.yaml
-              mv /etc/netplan/00-installer-config{.brkfix,.yaml}
+              info "  Fixing networking in lab enviornment."
 
-              netplan apply
-            fi
+              case $g_CH21_BRKFIX in
+                22.1)
+                  # FIXING ROUTES
+                  info "    Repairing default routes."
+                  route del default
+                  route add default gw 10.250.5.1 ens160
 
-            # IF CHANGES WERE MADE TO THE RESOLVER, REVERT THEM
-            if [ "$(cat /etc/resolv.conf | grep -o "nameserver 10.0.5.53")" != "nameserver 10.0.5.53" ]; then
-              info "    Repairing modifications to nameservers."
-              sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
-            fi
+                  info "    Removing break/fix information file."
+                  rm "$g_LAB_PATH/.brkfix"
+                ;;
+                66.3)
+                  # FIXING NETPLAN
 
-            # RELEASE AND RENEW THE IP ADDRESS
-            info "    Releasing and renewing IP address from DHCP server."
-            dhclient -r &>/dev/null
-            dhclient
+                  info "    Reverting interface configurations."
+                  rm /etc/netplan/00-installer-config.yaml
+                  mv /etc/netplan/00-installer-config{.brkfix,.yaml}
 
-            # CHECK FOR CHANGES TO THE DEFAULT GATEWAY AND REPAIR THEM
-            ping -q -c1 8.8.8.8 &>/dev/null
-            if [ $? == 1 ]; then
-              info "    Repairing default routes."
-              route del default
-              route add default gw 10.250.5.1 ens160
-            fi
+                  netplan apply
+
+                  info "    Removing break/fix information file."
+                  rm "$g_LAB_PATH/.brkfix"
+                ;;
+                106.5)
+                  # FIXING NETPLAN
+
+                  info "    Reverting interface configurations."
+                  rm /etc/netplan/00-installer-config.yaml
+                  mv /etc/netplan/00-installer-config{.brkfix,.yaml}
+
+                  netplan apply
+
+                  info "    Removing break/fix information file."
+                  rm "$g_LAB_PATH/.brkfix"
+                ;;
+                77.4)
+                  # FIXING DNS
+                  info "    Repairing modifications to nameservers."
+                  sed -i 's/nameserver 10.0.5.53/nameserver 127.0.0.53/' /etc/resolv.conf
+
+                  info "    Removing break/fix information file."
+                  rm "$g_LAB_PATH/.brkfix"
+                ;;
+              esac
+
+                # RELEASE AND RENEW THE IP ADDRESS
+                info "    Releasing and renewing IP address from DHCP server."
+                dhclient -r &>/dev/null
+                dhclient
+              fi
 
             info "  The networking in the lab environment has been repaired."
             info "  Your IP address is: $(hostname -I | awk '{print $1}')."
+          else
+            warning "  The break/fix file is missing."
+            cleanup_and_exit_with_code 1
           fi
         fi
       ;;
