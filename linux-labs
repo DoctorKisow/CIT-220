@@ -26,7 +26,7 @@
 # ##############################################################################
 # Virtual Machine Setup
 #
-# SCSI1: 160Gb    sda             8:0    0   160G  0 disk 
+# SCSI1: 160Gb    sda             8:0    0   160G  0 disk
 #                 ├─sda1          8:1    0     1M  0 part  (BIOS OFFSET)
 #                 ├─sda2          8:2    0    30G  0 part  /
 #                 ├─sda3          8:3    0    15G  0 part  /tmp
@@ -37,13 +37,13 @@
 #                 ├─sda8          8:8    0    30G  0 part  /var
 #                 └─sda9          8:9    0     4G  0 part  [SWAP]
 #
-#                 sdb             8:16   0   128M  0 disk 
+#                 sdb             8:16   0   128M  0 disk
 #                 └─sdb1          8:17   0   127M  0 part  /labs/CH12/LAB12-02-Q
-#                 sdc             8:32   0   128M  0 disk 
+#                 sdc             8:32   0   128M  0 disk
 #                 └─sdc1          8:33   0   127M  0 disk  /labs/CH18/LAB18-01
-#                 sdd             8:48   0   128M  0 disk 
+#                 sdd             8:48   0   128M  0 disk
 #                 └─vg1-CIT220  253:0    0   248M  0 lvm   /labs/CH19/LAB19-01
-#                 sde             8:64   0   128M  0 disk 
+#                 sde             8:64   0   128M  0 disk
 #                 └─vg1-CIT220  253:1    0   248M  0 lvm   /labs/CH19/LAB19-01
 #                 sdf             8:80   0   128M  0 disk
 #                 └─md0           9:0    0   252M  0 raid5 /labs/CH19/LAB19-02
@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.89"
+g_VERSION="0.0.90"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -131,6 +131,8 @@ declare g_LAB_PROFILE="${g_PROGRAM_NAME}.profile"
 declare g_CLASS_NAME="CIT-220"
 declare g_FIRST_TOKEN=""
 declare g_INSTALL_DATE=""
+
+declare -i g_DEBUG=0
 
 # **************************** basic script functions **************************
 # (cleanup_and_exit_with_code) - Function used to properly cleanup the enviornment after an error; the passed value are 1 (error) or 0 (normal).
@@ -308,11 +310,13 @@ function process_command_line_options ()
   # (l_RC) - Local boolean value used to test if any commandline arguements passed from the cammandline during script execution are invalid.
   declare -i l_RC
 
-  # Error trapping is turned off because we want to handle errors.
-  set +e
+  # Disable error trapping to capture getopt options.
+  set_error_trapping 0
     l_TEMP="$(getopt -o bc:fg:hiIr:R:uUvz --long break,fix,install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
     l_RC="${?}"
-  set -e
+
+  # Re-enable error trapping after capturing getopt options.
+  set_error_trapping 1
 
   # Check if any invalid options were passed and display help.
   if ((l_RC!=0)); then
@@ -421,8 +425,10 @@ function set_error_trapping ()
 # (trap_cleanup) - Function used to set how we want the script to handle any error conditions it encounters and what we want to do once those error conditions are encountered.
 function trap_cleanup ()
 {
-  trap - SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
-  error "Caught signal"
+  if ((g_DEBUG==0)); then
+    trap - SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
+    error "Caught signal"
+  fi
 }
 trap trap_cleanup SIGHUP SIGQUIT SIGINT SIGTERM SIGKILL EXIT
 
@@ -820,9 +826,8 @@ function reset_labuser ()
 
   info "Resetting the labuser$l_LABUSER account and associated groups back to default."
 
-  # Ignore error when adding users, due to manually setting UID/GID.
-  set +e
-  set +u
+  # Disable error handelings.
+  set_error_trapping 0
 
   case "${l_LABUSER}" in
     1)  test_user labuser1
@@ -855,10 +860,42 @@ function reset_labuser ()
     5)  warning "Cannot reset this user, reset lab CH12-02 by typing \"linux-labs -r 12\"." ;;
   esac
 
-  # Ignore error when adding users, due to manually setting UID/GID.
-  set +e
-  set +u
+  # Re-enable error handeling.
+  set_error_trapping 1
 
+}
+
+# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
+function set_error_trapping ()
+{
+     # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
+     l_BOOL='^[0-1]+$'
+     if ! [[ $1 =~ $l_BOOL ]]; then
+          error "Function: set_error_trapping was passed a value that is out of bounds."
+     fi
+
+     # (l_TRAP) - Local boolean value used to enable and disable how the script behaves when certain error conditions are met.
+     local l_TRAP="${1}"
+
+     if ((l_TRAP == 0)); then
+          # Disable errors when a command exits with a non-zero status.
+          set +e
+
+          # Disable errors on unbound (undefined) variables.
+          set +u
+
+          # Disable allowing filename patterns that match no files to expand to a null string, rather than themselves.
+          shopt -u nullglob
+     else
+          # Enable exiting immediately if a command exits with a non-zero status.
+          set -e
+
+          # Enable erroring on unbound (undefined) variables.
+          set -u
+
+          # Enable filename patterns that match no files to expand to a null string, rather than themselves.
+          shopt -s nullglob
+     fi
 }
 
 # (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
@@ -1211,9 +1248,8 @@ function base ()
     warning "A previous lab enviornment may not have been cleaned up corretly."
   fi
 
-  # Ignore error when adding users, due to manually setting UID/GID.
-  set +e
-  set +u
+  # Disable error when adding users, due to manually setting UID/GID.
+  set_error_trapping 0
 
   # UID 500 - mkisowa
   info "    Creating the mkisowa group."
@@ -1283,9 +1319,8 @@ function base ()
     warning "    A previous lab enviornment may not have been cleaned up corretly."
   fi
 
-  # Reapply error trapping.
-  set -e
-  set -u
+  # Re-enable error when adding users, due to manually setting UID/GID.
+  set_error_trapping 1
 
   # CREATE DIRECTORY
   info "  Creating the lab directories and symlink."
@@ -4139,6 +4174,11 @@ function chapter_29 ()
 }
 
 # *************************** begin of script proper ***************************
+# If script debugging is enabled, disable error trapping and un-bound variable checking.
+if ((g_DEBUG==1)); then
+     set_error_trapping 0
+fi
+
 process_command_line_options "${@}"
 internal_consistency_option_checks
 
