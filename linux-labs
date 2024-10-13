@@ -67,7 +67,7 @@ shopt -s nullglob
 
 # ************************* global variable definitions ************************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.91"
+g_VERSION="0.0.92"
 g_PROGRAM_NAME="linux-labs"
 g_PROGRAM_DESCRIPTION="A script used to download, setup and grade the CIT-220 lab enviornment"
 g_SCRIPT_URL="https://github.com/DoctorKisow/CIT-220/raw/main/linux-labs"
@@ -132,7 +132,7 @@ declare g_CLASS_NAME="CIT-220"
 declare g_FIRST_TOKEN=""
 declare g_INSTALL_DATE=""
 
-# (g_DEBUG) - Boolean value used to enable and disable error handeling, unbound variables and filename pattern matching for debugging; the passed value are 1 (debug) or 0 (normal).
+# (g_DEBUG) - Boolean value used to enable and disable error handeling, unbound variables and filename pattern matching for debugging; the default value is 0.
 declare -i g_DEBUG=0
 
 # **************************** basic script functions **************************
@@ -312,12 +312,18 @@ function process_command_line_options ()
   declare -i l_RC
 
   # Disable error trapping to capture getopt options.
-  set_error_trapping 0
-    l_TEMP="$(getopt -o bc:fg:hiIr:R:uUvz --long break,fix,install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
-    l_RC="${?}"
+  if ((g_DEBUG==0)); then
+    set_error_trapping 1
+  fi
+
+  # Set script commandline options.
+  l_TEMP="$(getopt -o bc:fg:hiIr:R:uUvz --long break,fix,install,update,uninstall -n "${g_PROGNAME}" -- "${@}")"
+  l_RC="${?}"
 
   # Re-enable error trapping after capturing getopt options.
-  set_error_trapping 1
+  if ((g_DEBUG==0)); then
+    set_error_trapping 0
+  fi
 
   # Check if any invalid options were passed and display help.
   if ((l_RC!=0)); then
@@ -382,7 +388,7 @@ function script_banner ()
   fi
 }
 
-# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
+# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 0 for disabled or 1 for enabled.
 function set_error_trapping ()
 {
   # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
@@ -391,8 +397,7 @@ function set_error_trapping ()
     error "Function: set_error_trapping was passed a value that is out of bounds."
   fi
 
-  # (l_TRAP) - Local boolean value used to enable and disable how the script
-  # behaves when certain error conditions are met.
+  # (l_TRAP) - Local boolean value used to enable and disable how the script behaves when certain error conditions are met.
   local l_TRAP="${1}"
 
   if ((l_TRAP == 0)); then
@@ -402,8 +407,7 @@ function set_error_trapping ()
     # Disable errors on unbound (undefined) variables.
     set +u
 
-    # Disable allowing filename patterns that match no files to expand to a null
-    # string, rather than themselves.
+    # Disable allowing filename patterns that match no files to expand to a null string, rather than themselves.
     shopt -u nullglob
   else
     # Enable exiting immediately if a command exits with a non-zero status.
@@ -412,8 +416,7 @@ function set_error_trapping ()
     # Enable erroring on unbound (undefined) variables.
     set -u
 
-    # Enable filename patterns that match no files to expand to a null
-    # string, rather than themselves.
+    # Enable filename patterns that match no files to expand to a null string, rather than themselves.
     shopt -s nullglob
   fi
 }
@@ -445,7 +448,7 @@ function update ()
   fi
 
   # Test name resolution.
-  ping -q -c1 github.com &>/dev/null
+  ping -q -c1 dns.google.com &>/dev/null
   if [ $? == 1 ]; then
     warning "This script does not have a network resolver capable of looking up DNS requests."
     return
@@ -830,7 +833,9 @@ function reset_labuser ()
   info "Resetting the labuser$l_LABUSER account and associated groups back to default."
 
   # Disable error handelings.
-  set_error_trapping 0
+  if ((g_DEBUG==0)); then
+    set_error_trapping 0
+  fi
 
   case "${l_LABUSER}" in
     1)  test_user labuser1
@@ -864,41 +869,10 @@ function reset_labuser ()
   esac
 
   # Re-enable error handeling.
-  set_error_trapping 1
+  if ((g_DEBUG==0)); then
+    set_error_trapping 1
+  fi
 
-}
-
-# (set_error_trapping) - Function used to enable and disable error handeling, unbound variables and filename pattern matching; the passed value is 1 for enabled or 0 for disabled.
-function set_error_trapping ()
-{
-     # (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
-     l_BOOL='^[0-1]+$'
-     if ! [[ $1 =~ $l_BOOL ]]; then
-          error "Function: set_error_trapping was passed a value that is out of bounds."
-     fi
-
-     # (l_TRAP) - Local boolean value used to enable and disable how the script behaves when certain error conditions are met.
-     local l_TRAP="${1}"
-
-     if ((l_TRAP == 0)); then
-          # Disable errors when a command exits with a non-zero status.
-          set +e
-
-          # Disable errors on unbound (undefined) variables.
-          set +u
-
-          # Disable allowing filename patterns that match no files to expand to a null string, rather than themselves.
-          shopt -u nullglob
-     else
-          # Enable exiting immediately if a command exits with a non-zero status.
-          set -e
-
-          # Enable erroring on unbound (undefined) variables.
-          set -u
-
-          # Enable filename patterns that match no files to expand to a null string, rather than themselves.
-          shopt -s nullglob
-     fi
 }
 
 # (test_user) - Function used to test for the existence of a user then remove them. Passes arguements ($1) username.
@@ -1252,7 +1226,9 @@ function base ()
   fi
 
   # Disable error when adding users, due to manually setting UID/GID.
-  set_error_trapping 0
+  if ((g_DEBUG==0)); then
+    set_error_trapping 0
+  fi
 
   # UID 500 - mkisowa
   info "    Creating the mkisowa group."
@@ -1323,7 +1299,9 @@ function base ()
   fi
 
   # Re-enable error when adding users, due to manually setting UID/GID.
-  set_error_trapping 1
+  if ((g_DEBUG==0)); then
+    set_error_trapping 1
+  fi
 
   # CREATE DIRECTORY
   info "  Creating the lab directories and symlink."
@@ -1397,8 +1375,8 @@ function base ()
 
 	# Check if script is running as root first
 	if [[ "$(whoami)" != "root" ]]; then
-	echo "$(tput setaf 1)Script must be ran as root! Example: sudo ./template-prep.sh$(tput sgr 0)"
-	exit 1
+		echo "$(tput setaf 1)Script must be ran as root! Example: sudo ./template-prep.sh$(tput sgr 0)"
+		exit 1
 	fi
 
 	#Shutdown SSH
@@ -1441,6 +1419,15 @@ function base ()
 	echo "      dhcp-identifier: mac" >> /etc/netplan/00-installer-config.yaml
 
 	chmod 600 /etc/netplan/00-installer-config.yaml
+
+	if [ -f /etc/resolv.conf ]; then
+		rm /etc/resolv.conf
+	fi
+
+	if [ -f /run/systemd/resolv/stub-resolv.conf ]; then
+		ln -s /run/systemd/resolv/stub-resolv.conf /etc/resolv.conf
+	fi
+
 	#Cleanup and Shutdown
 	truncate -s0 ~/.bash_history
 	truncate -s0 /home/mkisowa/.bash_history
@@ -4179,7 +4166,7 @@ function chapter_29 ()
 # *************************** begin of script proper ***************************
 # If script debugging is enabled, disable error trapping and un-bound variable checking.
 if ((g_DEBUG==1)); then
-     set_error_trapping 0
+  set_error_trapping 0
 fi
 
 process_command_line_options "${@}"
