@@ -448,6 +448,13 @@ function update ()
     return
   fi
 
+  # Test name resolution.
+  ping -q -c1 github.com &>/dev/null
+  if [ $? == 1 ]; then
+    warning "This script does not have a network resolver capable of looking up DNS requests."
+    return
+  fi
+
   # Get a new version of the script.
   l_TMP_FILE=$(mktemp -p "" "XXXXX.sh")
   curl -s -L "$g_SCRIPT_URL" > "$l_TMP_FILE"
